@@ -1,5 +1,7 @@
 package com.colin.threadlocal;
 
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -9,6 +11,8 @@ import java.util.concurrent.TimeUnit;
 public class ThreadLocalDemo {
 
     public static void main(String[] args) {
+
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat();
 
         House house = new House();
 

@@ -1,3 +1,6 @@
+# Java Concurrent Util
+
+
 ## 线程基础知识
 
 **JUC 四大口诀**
@@ -319,130 +322,6 @@ CompletableFuture：
    // 两个 CompletionStage 任务都完成后，最终能把两个任务的结果一起交给 thenCombine 来处理。先完成的先等着，等待其它分支任务
    public <U,V> CompletableFuture<V> thenCombine;
    ```
-
----
-
-## Java 锁
-
-#### 8 锁案例
-
-
-
-<br>
-
-#### 乐观锁与悲观锁
-
-- 乐观锁：认为自己在使用数据的时候不会有其它的线程来修改数据，所以不会加锁，只是在更新数据的时候取判断之前有没有别的线程更新了这个数据。如果这个数据没有被更新，当前线程将自己修改的数据成功写入；如果数据已经被其它线程更新了，则根据不同的实现方式，执行不同的操作。**乐观锁在 Java 中是通过无锁编程来实现的，最常采用的方式是 CAS 算法，Java 原子类中的递增操作就是通过 CAS 自旋实现的。**
-- 悲观锁：认为自己在使用数据的时候一定有其它的线程来修改数据，因此在获取数据的时候会先加锁，确保数据不会被其它线程修改。synchronize 关键字和 Lock 的实现类都属于悲观锁。适合写操作比较多的场景，先加锁可以保证写操作时数据正确。**显式加锁之后再操作同步资源。**
-
-<br>
-
-#### 公平锁和非公平锁
-
-FIFO（First In First Out） 属于公平锁，否则属于非公平锁。
-
-按序排队属于公平锁，就是判断同步队列是否还有先驱节点的存在，如果没有，才能获取到锁，如果有，等待先驱节点释放锁。
-
-先占先得属于非公平锁。
-
-默认采用非公平锁的原因：
-
-1. 恢复挂起的线程到真正锁的获取是有时间差的，从开发人员的角度来看这个时间微乎其微，但从 CPU 的角度看，这个时间差是很明显的，所**以非公平锁能够更充分利用 CPU 的时间片，尽量减少 CPU 空间状态时间；**
-2. 使用多线程很重要的考量点是线程切换的开销，当采用非公平锁时，当1个线程请求锁获取同步状态，然后释放同步状态，因为不需要考虑是否还有前驱节点，所以刚释放锁的线程在此刻再次获取同步状态的概率就变得非常大，所以就减少了线程的开销。
-3. 如果使用的是公平锁，虽然保证了排队的公平性，但可能导致长时间在排队等待获取锁，就造成了“锁饥饿”。
-4. 如果为了提高吞吐量，使用非公平锁很合适，因为减少了很多线程的切换时间
-
-<br>
-
-#### 可重入锁
-
-可重入锁又称递归锁。是指同一个线程在外层方法获取到锁的时候，在进入该线程的内层方法时，就会自动获取到锁（前提是锁对象是同一个对象），不会因为之前已经获取到的锁没有释放而阻塞。Java 中 ReentrantLock 和 synchronized 都是可重入锁，可重入锁的一个优点就是可一定程度上避免死锁。
-
-可重入锁的种类：
-
-1. 隐式锁；synchronized 关键字修饰的锁。
-
-   > synchronized 可重入锁的实现原理：
-   >
-   > 1. 每个锁对象拥有一个锁计数器和一个指向持有该锁的线程的指针。
-   > 2. 当执行 monitorenter 时，如果目标锁对象的计数器为零，那么说明它没有被其它线程所持有，Java 虚拟机会将该锁对象的持有线程设置为当前线程，并且将计数器加一
-   > 3. 当执行 monitorenter 时，如果目标锁对象的计数器不为零，且锁对象持有的线程是当前线程，那么 Java 虚拟机可以将其计数器加一，否则需要等待，直至持有线程释放该锁。
-   > 4. 当执行 monitorexit 时，Java 虚拟机需将锁对象的计数器减一，当计数器为零时，代表锁已经被释放了。
-
-2. 显式锁：Lock 的实现类，例如 ReentrantLock。
-
-   > lock.lock()：加锁
-   >
-   > lock.unlock()：解锁
-   >
-   > 显式锁的加锁与解锁需成对出现，即加几次锁就要解几次锁。
-
-<br>
-
-#### 死锁
-
-死锁是指两个或以上的线程在执行过程中，因争夺资源而造成的一种**互相等待的现象**，若无外力干涉，那它们将无法推进下去，如果系统资源充足，进程的资源请求能够得到满足，死锁出现的可能性就低，否则就会因争夺有限的资源而陷入死锁。
-
-```java
-public static void main(String[] args) {
-
-    final Object objectLockA = new Object();
-    final Object objectLockB = new Object();
-
-    new Thread(() -> {
-        synchronized (objectLockA)
-        {
-            System.out.println(Thread.currentThread().getName()+"\t"+"自己持有A，希望获得B");
-            //暂停几秒钟线程
-            try { TimeUnit.SECONDS.sleep(1); } catch (InterruptedException e) { e.printStackTrace(); }
-            synchronized (objectLockB)
-            {
-                System.out.println(Thread.currentThread().getName()+"\t"+"A-------已经获得B");
-            }
-        }
-    },"A").start();
-
-    new Thread(() -> {
-        synchronized (objectLockB)
-        {
-            System.out.println(Thread.currentThread().getName()+"\t"+"自己持有B，希望获得A");
-            //暂停几秒钟线程
-            try { TimeUnit.SECONDS.sleep(1); } catch (InterruptedException e) { e.printStackTrace(); }
-            synchronized (objectLockA)
-            {
-                System.out.println(Thread.currentThread().getName()+"\t"+"B-------已经获得A");
-            }
-        }
-    },"B").start();
-
-}
-```
-
-死锁的排查：
-
-- 命令方式：
-
-  > jps -l：查找所有 Java 进程
-  >
-  > jstack 进程编号：查看该进程详情
-
-- 图形化工具方式：jconsole
-
-<br>
-
-#### 读锁（共享锁）与写锁（独占锁）
-
-<br>
-
-自旋锁
-
-<br>
-
-#### 无锁→独占锁→读写锁→邮戳锁
-
-<br>
-
-#### 无锁→偏向锁→轻量锁→重量锁
 
 
 
@@ -1264,43 +1143,1517 @@ final void longAccumulate(long x, LongBinaryOperator fn,
 
 ## ThreadLocal
 
+#### ThreadLocal 的使用
+
 ThreadLocal 提供线程局部变量副本。这些变量与正常的变量不同，因为每一个线程在访问 ThreadLocal 实例的时候（通过 get 或 set 方法）都有**自己的、独立初始化的变量副本**。**ThreadLocal 实例通常是类中的私有静态字段，使用它的目的是希望将状态（例如用户 ID 或事物 ID）与线程关联起来。**
 
 ThreadLocal 实现每个线程都有自己专属的本地变量副本，主要解决了让每一个线程绑定自己的值，通过使用 get() 和 set() 方法，获取默认值或将其值更改为当前线程所存储的副本的值，从而避免了线程安全问题。
 
-常用 API
+<br>
 
+##### 阿里 Java 开发手册中关于 ThreadLocal 的相关应用 
 
+【强制】SimpleDateFormat 是线程不安全的类，一般不要定义为 static 变量，如果定义为 static，必须加锁，或者使用 DateUtils 工具类。
 
+正例：注意线程安全，使用 DateUtils。亦推荐如下处理：
 
+```java
+private static final ThreadLocal<DateFormat> df = new ThreadLocal<DateFormat>() {
+		@Override 
+  	protected DateFormat initialValue() { 
+      return new SimpleDateFormat("yyyy-MM-dd"); 
+    }
+};
+```
+
+说明：如果是 JDK8 的应用，可以使用 Instant 代替 Date，LocalDateTime 代替 Calendar， DateTimeFormatter 代替 SimpleDateFormat，官方给出的解释：simple beautiful strong immutable thread-safe。
+
+> SimpleDateFormat 官方注释：SimpleDateFormat 中的日期格式不是同步的。推荐为每个线程创创建独立的格式实例。如果过个线程访问一个格式，则它必须保持外部同步。
+>
+> SimpleDateFormat 类内部有一个 Calendar 对象引用，它用来存储和这个 SimpleDateFormat 相关的日期信息，例如：sdf.parse(dateStr)、sdf.format(date)。诸如此类的方法参数传入的日志相关 String，Ddate 等等，都是交由 Calendar 来储存的，这样就会导致如果 SimpleDateFormat 是静态的，那么多个线程之间就会共享这个 SimpleDateFormat，同时也是共享这个 Calendar 应用。（多线程操作共享内容，没有加锁的话就会出现数据异常的情况。）
+
+```java
+// 第一种解决方式：ThreadLocal 可以确保每个线程都可以得到各自单独的一个 SimpleDateFormat 的对象，那么自然也就不存在竞争问题了。
+private static final ThreadLocal<SimpleDateFormat>  sdf_threadLocal =
+            ThreadLocal.withInitial(()-> new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"));
+
+sdf_threadLocal.get().parse("2021-11-11 11:11:11");
+
+// 第二种解决方式：使用 DateTimeFormatter 代替 SimpleDateFormat
+public static final DateTimeFormatter DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+LocalDateTime.parse("2021-11-11 11:11:11", DATE_TIME_FORMAT)
+```
+
+<br>
+
+【参考】ThreadLocal 对象使用 static 修饰，ThreadLocal 无法解决共享对象的更新问题。
+
+说明：这个变量是针对一个线程内所有操作共享的，所以设置为静态变量，所有此类实例共享此静态变量， 也就是说在类第一次被使用时装载，只分配一块存储空间，所有此类的对象(只要是这个线程内定义的)都可 以操控这个变量。
+
+<br>
+
+#### Thread，ThreadLocal，ThreadLocalMap 之间的关系
+
+<img src="img/Thread-ThreadLocal-ThreadLocalMap之间的关系.jpg" style="zoom: 25%;" />
+
+> ThreadLocalMap 实际上就是一个以 ThreadLocal 实例为 key，任意对象为 value 的 Entry 对象。
+>
+> 当我们为 ThreadLocal 变量赋值时，实际上就是以当前 ThreadLocal 实例为 key，值为 value 的 Entry，往这个 ThreadLocalMap 中存放。
+>
+> ThreadLocal 对象：JVM 内部维护了一个线程版的 Map<Thread,T>(通过 ThreadLocal 对象的 set 方法，结果把 ThreadLocal 对象自己当做 key，放进了 ThreadLocalMap 中)，每个线程要用到这个 T 的时候，用当前线程去 map 中查找，通过这样让每个线程都拥有了自己独立的变量，在并发场景下是绝对安全的变量。
+
+<br>
+
+#### ThreadLocal内存泄露
+
+【强制】必须回收自定义的 ThreadLocal 变量，尤其在线程池场景下，线程经常会被复用， 如果不清理自定义的 ThreadLocal 变量，可能会影响后续业务逻辑和造成内存泄露等问题。 尽量在代理中使用 try-finally 块进行回收。正例：
+
+```java
+objectThreadLocal.set(userInfo); 
+try {
+	// ... 
+} finally {
+	objectThreadLocal.remove();
+}
+```
+
+##### 什么是内存泄漏
+
+不再被使用的对象或变量所占用的内存不能被回收，就是内存泄漏。
+
+<br>
+
+##### Java 中的几种引用类型
+
+- 强引用
+
+  > 当内存不足时，JVM 开始垃圾回收，对于强引用的对象，就算是出现了 OOM，JVM 也不会对该对象进行回收。
+  >
+  > 强引用是我们最常见的普通对象引用，只要还有强引用指向一个对象，就能表明对象还“活着”，垃圾收集器不会碰这种对象。在 Java 中最常见的就是强引用，把一个对象赋给一个引用变量，这个引用变量就是一个强引用。当一个对象被强引用变量引用时，它处于可达状态，它是不可能被垃圾回收机制回收的， 即使该对象以后永远都不会被用到，JVM 也不会回收 。因此强引用是造成 Java 内存泄漏的主要原因之一。 
+  >
+  > 对于一个普通的对象，如果没有其他的引用关系，只要超过了引用的作用域或者显式地将相应（强）引用赋值为 null， 一般认为就是可以被垃圾收集的了(当然具体回收时机还是要看垃圾收集策略)。 
+
+- 软引用
+
+  > 软引用是一种相对强引用弱化了一些的引用，需要用 SoftReference 类来实现，可以让对象豁免一些垃圾收集。对于只有软引用的对象来说：
+  >
+  > - 当系统内存充足时，它是不会被回收的
+  > - 当系统内存不充足时，它会被回收
+  >
+  > 软引用通常用在对内存敏感的程序中，比如高速缓存就有用到软引用，或者某个需要读取大量的本地图片的应用，可以是用软引用来解决。设计思路是：
+  >
+  > - 用一个HashMap 来保存图片的路径和相应图片对象关联的软引用之间的映射关系，在内存不足时，JVM 会自动回收这些缓存图片对象所占用的空间，从而有效避免了 OOM 的问题。
+  > - Map<String, SoftReference<Bitmap>> imageCache = new HashMap<String, SoftReference<Bitmap>>();
+  >
+  > 
+
+- 弱引用
+
+  > 弱引用需要用 WeakReference 来实现，它比软引用的生存期更短，对于只有弱引用的对象来说，只要垃圾回收机制一运行，不管 JVM 的内存空间是否充足，都会回收该对象所占用的内存。
+
+- 虚引用
+
+  > 虚引用需要 PhantomReference 来实现。与其它几种引用都不同，虚引用并不会决定对象的生命周期。
+  >
+  > 如果一个对象持有虚引用，那么它就和没有任何引用一样，在任何时候都可能被垃圾回收器回收掉。
+  >
+  > 它不能单独使用也不能通过它访问对象，虚引用必须和引用队列 (ReferenceQueue)联合使用。
+  >
+  > 虚引用的主要作用是跟踪对象被垃圾回收的状态。 **仅仅是提供了一种确保对象被 finalize 以后，做某些事情的机制。
+  >
+  > PhantomReference 的 get 方法总是返回 null，因此无法访问对应的引用对象。
+  >
+  > 其意义在于：说明一个对象已经进入 finalization 阶段，可以被gc回收，用来实现比 finalization 机制更灵活的回收操作。
+  >
+  > 换句话说，设置虚引用关联的唯一目的，就是在这个对象被收集器回收的时候，收到一个系统通知或者后续添加进一步的处理。
+
+  ```java
+  // 虚引用的构造
+  public PhantomReference(T referent, ReferenceQueue<? super T> q) {
+  		super(referent, q);
+  }
+  ```
+
+  <img src="img/GCRoots和四大引用.jpg" style="zoom:25%;" />
+
+<br>
+
+##### ThreadLocalMap 与 WeakReference
+
+ThreadLocalMap 是一个保存了 ThreadLocal 对象的 Map，是经过了两层包装的 ThreadLocal 对象：
+
+1. 第一层包装是使用 WeakReference<ThreadLocal<?>> 将 ThreadLocal 对象变成一个弱引用的对象
+2. 第二层包装是定义了一个专门的类 Entry，来扩展 WeakReference<ThreadLocal<?>>
+
+每个 Thread 对象维护着一个 ThreadLocalMap 的引用，ThreadLocalMap 是 ThreadLocal 的内部类，用 Entry 来进行存储：
+
+- 调用 ThreadLocal 的 set() 方法时，实际上就是往 ThreadLocalMap 设置值，key 是 ThreadLocal 对象，值 Value 是传递进来的对象；
+- 调用 ThreadLocal 的 get() 方法时，实际上就是从 ThreadLocalMap 获取值，key 是 ThreadLocal 对象
+- ThreadLocal 本身并不存储值，它只是自己作为一个 key 来让线程从 ThreadLocalMap 获取 value，正因为这个原理，所以 ThreadLocal 能够实现“数据隔离”，获取当前线程的局部变量值，不受其他线程影响～。
+
+<br>
+
+##### ThreadLoaclMap 为什么使用弱引用
 
 
 
 ---
 
-## Java 对象内存布局和对象头
+## Java 对象内存布局
+
+#### 对象的内存布局
+
+在 HotSpot 虚拟机中，对象在堆内存中的存储布局可以分为三个部分：
+
+- **对象头（Header）**
+- **实例数据（Instance Data**）：存放类的属性（Field）数据信息，包括父类的属性信息。如果是数组的实例部分，还包括数组的长度，这部分内存按 4 个字节对齐。
+- **对齐填充（Padding）**：虚拟机要求对象起始地址必须是 8 字节的整数倍，填充数据不是必须存在的，仅仅是为了字节对齐，这部分内存按 8 字节补充对齐。保证 8 个字节的倍数
+
+<br>
+
+#### 对象头包含的内容
+
+##### 对象标记（MarkWord）
+
+默认存储对象的 Hashcode、分带年龄和锁标志位等信息。这些信息都是与对象自身定义无关的数据，所以 MarkWord 被设计成一个非常固定的数据结构，以便在极小的空间存储尽量多的数据。它会根据对象的状态，复用自己的存储空间，也就是说在运行期间 MarkWord 里存储的数据会随着锁标志位的变化而变化。
+
+**HotSpot虚拟机对象头 MarkWord**
+
+| 存储内容                              | 标志位 | 状态               |
+| ------------------------------------- | ------ | ------------------ |
+| 对象哈希码、对象分代年龄              | 01     | 未锁定             |
+| 指向锁记录的指针                      | 00     | 轻量级锁定         |
+| 指向重量级锁的指针                    | 10     | 膨胀（重量级锁定） |
+| 空，不需要记录信息                    | 11     | GC 标记            |
+| 偏向线程 ID、偏向时间戳、对象分代年龄 | 01     | 可偏向             |
+
+**MarkWord 存储结构：64 虚拟机下，MarkWord 是 64bit 大小的，其存储结构如下表**
+
+<table align="center">
+  <tr align="center">
+    <td rowspan="2">锁状态</td>
+    <td colspan="2">56bit</td>
+    <td rowspan="2">1it</td>
+    <td rowspan="2">4it</td>
+    <td rowspan="2">1bit（是否偏向锁）</td>
+    <td rowspan="2">25it（锁标志位）</td>
+  </tr>
+  <tr align="center">
+  	<td>25bit</td>
+    <td>31bit</td>
+  </tr>
+  <tr align="center">
+    <td>无锁</td>
+    <td>unused</td>
+    <td>对象 hashcode</td>
+    <td>Cms_free</td>
+    <td>对象分代年龄</td>
+    <td>0</td>
+    <td>01</td>
+  </tr>
+  <tr align="center">
+    <td>偏向锁</td>
+    <td colspan="2">ThreadID(54bit)(偏向锁的线程 ID)Epoch(2bit)</td>
+    <td>Cms_free</td>
+    <td>对象分代年龄</td>
+    <td>1</td>
+    <td>01</td>
+  </tr>
+  <tr align="center">
+    <td>轻量级锁</td>
+    <td colspan="5">指向栈中锁的记录的指针</td>
+    <td>00</td>
+  </tr>
+    <tr align="center">
+    <td>重量级锁</td>
+    <td colspan="5">指向重量级锁的指针</td>
+    <td>10</td>
+  </tr>
+    </tr>
+    <tr align="center">
+    <td>GC</td>
+    <td colspan="5">空</td>
+    <td>11</td>
+  </tr>
+</table>
+
+<br>
+
+Hotspot 的实现
+
+<table>
+  <tr align="center">
+    <td>锁状态</td>
+    <td>25位</td>
+    <td colspan="2">31位</td>
+    <td>1位</td>
+    <td>4位</td>
+    <td>1位(偏向锁位)</td>
+    <td colspan="2">2位(锁标志位)</td>
+  </tr>
+  <tr align="center">
+    <td>无锁状态</td>
+    <td>unused</td>
+    <td colspan="2">hashcode(如果有调用)</td>
+    <td>unused</td>
+    <td>分代年龄</td>
+    <td>0</td>
+    <td>0</td>
+    <td>1</td>  
+  </tr>
+  <tr align="center">
+    <td>锁状态</td>
+    <td colspan="2">54位</td>
+    <td>2位</td>
+    <td>1位</td>
+    <td>4位</td>
+    <td>1位(偏向锁)</td>
+    <td colspan="2">2位(锁标志位)</td>
+  </tr>
+  <tr align="center">
+    <td>偏向锁</td>
+    <td colspan="2">当前线程指针 JavaThread*</td>
+    <td>Epoch</td>
+    <td>unused</td>
+    <td>分代年龄</td>
+    <td>1</td>
+    <td>0</td>
+    <td>1</td>
+  </tr>
+  <tr align="center">
+    <td>锁状态</td>
+    <td colspan="6">62位</td>
+    <td colspan="2">2位(锁标志位)</td>
+  </tr>
+  <tr align="center">
+    <td>轻量级锁、自旋锁、无锁</td>
+    <td colspan="6">指向线程栈中 Lock Record 的指针</td>
+    <td>0</td>
+    <td>0</td>
+  </tr>
+  <tr align="center">
+    <td>重量级锁</td>
+    <td colspan="6">指向互斥量(重量级锁)的指针</td>
+    <td>1</td>
+    <td>0</td>
+  </tr>
+  <tr align="center">
+    <td>GC 标记信息</td>
+    <td colspan="6">CMS 过程用到的标记信息</td>
+    <td>1</td>
+    <td>1</td>
+  </tr>
+</table>
+
+> **对象布局、GC 回收和锁升级就是对象标记 MarkWord 里面的标志位的变化**
+
+<br>
+
+OpenJDK 源码
+
+```hpp
+oop.hpp
+👇🏻
+class oopDesc {
+  friend class VMStructs;
+ private:
+  volatile markOop  _mark;
+  union _metadata {
+    Klass*      _klass;
+    narrowKlass _compressed_klass;
+  } _metadata;
+
+  // Fast access to barrier set.  Must be initialized.
+  static BarrierSet* _bs;
+
+ public:
+  markOop  mark() const         { return _mark; }
+  markOop* mark_addr() const    { return (markOop*) &_mark; }
+  
+markOop.hpp
+/**
+ * hash：保存对象的哈希码
+ * age：保存对象的分代年龄
+ * biased_lock：偏向锁标识位
+ * lock：锁状态标识位
+ * JavaThread*：保存持有偏向锁的线程 ID
+ * epoch：保存偏向时间戳
+ */
+👇🏻
+//  64 bits:
+//  --------
+//  unused:25 hash:31 -->| unused:1   age:4    biased_lock:1 lock:2 (normal object)
+//  JavaThread*:54 epoch:2 unused:1   age:4    biased_lock:1 lock:2 (biased object)
+//  PromotedObject*:61 --------------------->| promo_bits:3 ----->| (CMS promoted object)
+//  size:64 ----------------------------------------------------->| (CMS free block)
+//
+//  unused:25 hash:31 -->| cms_free:1 age:4    biased_lock:1 lock:2 (COOPs && normal object)
+//  JavaThread*:54 epoch:2 cms_free:1 age:4    biased_lock:1 lock:2 (COOPs && biased object)
+//  narrowOop:32 unused:24 cms_free:1 unused:4 promo_bits:3 ----->| (COOPs && CMS promoted object)
+//  unused:21 size:35 -->| cms_free:1 unused:7 ------------------>| (COOPs && CMS free block)
+```
+
+<br>
+
+##### 类元信息
+
+对象指向它的类元数据的指针，虚拟机通过这个指针来确定这个对象是那个类的实例。
+
+<img src="img/类元信息指针.jpg" style="zoom:35%;" />
+
+<br>
+
+##### 对象头大小
+
+在 64 位系统中，MarkWord 占了 8 个字节，类型指针占了 8 个字节，一共是 16 个字节。
+
+<br>
+
+##### 利用 JOL 分析对象在JVM的大小和分布
+
+```xml
+<!--
+  官网：http://openjdk.java.net/projects/code-tools/jol/
+  定位：分析对象在JVM的大小和分布
+-->
+<dependency>
+    <groupId>org.openjdk.jol</groupId>
+    <artifactId>jol-core</artifactId>
+    <version>0.9</version>
+</dependency>
+```
+
+```java
+public class JOLDemo {
+
+    public static void main(String[] args) {
+        ObjectTest objectTest = new ObjectTest();
+        System.out.println(ClassLayout.parseInstance(objectTest).toPrintable());
+    }
+}
+
+class ObjectTest{
+    private boolean flag;
+    private int x;
+    private double y;
+}
+```
+
+> 运行结果 
+>
+>  OFFSET  SIZE      TYPE DESCRIPTION                               VALUE
+>       0          4           (object header)                           01 00 00 00 (00000001 00000000 00000000 00000000) (1)
+>       4          4           (object header)                           00 00 00 00 (00000000 00000000 00000000 00000000) (0)
+>       8          4           (object header)                           43 c1 00 f8 (01000011 11000001 00000000 11111000) (-134168253)
+>      12         4          int ObjectTest.x                           0
+>      16         8   	   double ObjectTest.y                   0.0
+>      24         1   	   boolean ObjectTest.flag            false
+>      25         7           (loss due to the next object alignment)
+> Instance size: 32 bytes
+>
+> 注：
+>
+> OFFSET 为 0、4 的 object header 是 MarkWord，占 8 个字节；OFFSET 为 8 的 object header 是类型指针，占 4 个字节
+>
+> OFFSET 为 12 的 x 变量占 4 个字节，OFFSET 为 16 的 y 变量占 8 个字节，OFFSET 为 24 的 flag 变量占 1 个字节
+>
+> OFFSET 为 25 为对齐填充，补齐 7 个字节，对象实例共占用 32 个字节。
+
+| 参数名称    | 参数说明                                     |
+| ----------- | -------------------------------------------- |
+| OFFSET      | 偏移量，也就是到这个字段位置所占用的 byte 数 |
+| SIZE        | 字节大小                                     |
+| TYPE        | Class 中定义的类型                           |
+| DESCRIPTION | 类型的描述                                   |
+| VALUE       | TYPE 在内存中的值                            |
 
 
 
 ---
 
-## Synchronized 与锁升级
+## synchronized 与锁升级
 
+#### 锁升级的过程
 
+无锁 → 偏向锁 → 轻量级锁 → 重量级锁
+
+<br>
+
+#### synchronized的性能变化
+
+##### Java 5 之前，用户态和内核态之间的切换
+
+- Java 的线程是映射到操作系统原生线程之上的，如果要阻塞或唤醒一个线程就需要操作系统介入，需要在户态与核心态之间切换，这种切换会消耗大量的系统资源，因为用户态与内核态都有各自专用的内存空间，专用的寄存器等，用户态切换至内核态需要传递给许多变量、参数给内核，内核也需要保护好用户态在切换时的一些寄存器值、变量等，以便内核态调用结束后切换回用户态继续工作。
+
+- 在 Java 早期版本中，synchronized 属于重量级锁，效率低下，因为监视器锁（monitor）是依赖于底层的操作系统的 Mutex Lock 来实现的，挂起线程和恢复线程都需要转入内核态去完成，阻塞或唤醒一个 Java 线程需要操作系统切换 CPU 状态来完成，这种状态切换需要耗费处理器时间，如果同步代码块中内容过于简单，这种切换的时间可能比用户代码执行的时间还长”，时间成本相对较高，这也是为什么早期的 synchronized 效率低的原因
+
+- OpenJDK 源码
+
+  ```hpp
+  ObjectMonitor* monitor() const {
+     assert(has_monitor(), "check");
+     // Use xor instead of &~ to provide one extra tag-bit check.
+     return (ObjectMonitor*) (value() ^ monitor_value);
+  }
+  ```
+
+  > Monitor（监视器锁） 可以理解为一种同步工具，也可以理解为一种同步机制，常常被描述为一个 Java 对象。Java 对象是天生的 Monitor，每一个 Java 对象都有成为 Monitor 的潜质，因为在 Java 设计中，每一个 Java 对象自创建以来就带有一把看不见的锁，它叫做内部锁或者 Monitor 锁。
+  >
+  > Monitor 是在 jvm 底层实现的，底层代码是 c++。本质是依赖于底层操作系统的 Mutex Lock 实现，操作系统实现线程之间的切换需要从用户态到内核态的转换，状态转换需要耗费很多的处理器时间，成本非常高。所以 synchronized 是 Java 语言中的一个重量级操作。 
+  >
+  > Monitor、java 对象以及线程之间的关联
+  >
+  > - 如果一个 java 对象被某个线程锁住，则该 java 对象的 Mark Word 字段中 LockWord 指向 monitor 的起始地址
+  > - Monitor 的 Owner 字段会存放拥有相关联对象锁的线程 id
+
+##### Java 6 开始优化 synchronized，为了减少获得锁和释放锁所带来的性能消耗，引入了轻量级锁和偏向锁。
+
+<br>
+
+#### synchronized 锁种类
+
+synchronized 用的锁是存在 Java 对象头里的 MarkWord 中，锁升级功能主要依赖 MarkWord 中锁标志位和释放偏向锁标志位。
+
+##### 无锁：程序不会有锁竞争
+
+```java
+public static void main(String[] args) {
+    Object o = new Object();
+
+    System.out.println("10进制hash码："+o.hashCode());
+    System.out.println("16进制hash码："+Integer.toHexString(o.hashCode()));
+    System.out.println("2进制hash码："+Integer.toBinaryString(o.hashCode()));
+
+    System.out.println( ClassLayout.parseInstance(o).toPrintable());
+}
+```
+
+> 10进制hash码：2016447921
+> 16进制hash码：78308db1
+> 2进制hash码：1111000001100001000110110110001
+>
+>  OFFSET  SIZE   TYPE DESCRIPTION                               VALUE
+>       0     4        (object header)                           01 b1 8d 30 (00000*<u>**001**</u>* 10110001 10001101 00110000) (814592257)
+>       4     4        (object header)                           78 00 00 00 (01111000 00000000 00000000 00000000) (120)
+>       8     4        (object header)                           e5 01 00 f8 (11100101 00000001 00000000 11111000) (-134217243)
+>      12     4       (loss due to the next object alignment)
+> Instance size: 16 bytes
+>
+> 注：OFFSET 为 0 的 object header 的 value 值，与 Hotspot 实现的 MarkWord 存储结构中的数据一致。（00000001 的后三位与表中的偏向锁位于锁标志位一致）
+
+<table>
+  <tr align="center">
+    <td>锁状态</td>
+    <td>25位</td>
+    <td colspan="2">31位</td>
+    <td>1位</td>
+    <td>4位</td>
+    <td>1位(偏向锁位)</td>
+    <td colspan="2">2位(锁标志位)</td>
+  </tr>
+  <tr align="center">
+    <td>无锁状态</td>
+    <td>unused</td>
+    <td colspan="2">hashcode(如果有调用)</td>
+    <td>unused</td>
+    <td>分代年龄</td>
+    <td>0</td>
+    <td>0</td>
+    <td>1</td>  
+  </tr>
+</table>
+
+<br>
+
+##### 偏向锁
+
+**理论落地：**
+
+- 在实际应用运行过程中发现，“锁总是由同一个线程持有，很少发生竞争”，也就是说锁总是被第一个占用他的线程拥有，这个线程就是锁的偏向线程；
+- 只需要在锁第一次被拥有的时候，记录下偏向线程 ID。这样偏向线程就一直持有着锁，后续这个线程进入和退出这段加了同步锁的代码块时，不需要再次加锁和释放锁。而是直接比较对象头里面是否存储了指向当前线程的偏向锁；
+- 如果相等表示偏向锁是偏向于当前线程的，就不需要再尝试获得锁了，直到竞争发生时才释放锁。以后每次同步，检查锁的偏向线程 ID 与当前线程 ID 是否一致，如果一致直接进入同步。无需每次加锁解锁都去 CAS 更新对象头。**如果自始至终使用锁的线程只有一个**，很明显偏向锁几乎没有额外开销，性能极高。
+- 假如不一致，意味着发生了竞争，锁已经不是总是偏向于同一个线程了，这时候可能需要升级变为轻量级锁，才能保证线程间公平竞争锁。偏向锁只有遇到其他线程尝试竞争偏向锁时，持有偏向锁的线程才会释放锁，线程是不会主动释放偏向锁的。
+
+**技术实现：**
+
+一个 synchronized 方法被一个线程抢到了锁时，那这个方法所在的对象就会在其所在的 Mark Word 中，将偏向锁修改状态位，同时还会有占用前 54 位来存储线程指针作为标识。若该线程再次访问同一个 synchronized 方法时，该线程只需去对象头的 Mark Word 中去判断一下，是否有偏向锁指向本身的 ID，无需再进入 Monitor 去竞争对象了。偏向锁的操作不用直接捅到操作系统，不涉及用户到内核转换，不必要直接升级为最高级，
+
+假如有一个线程执行到 synchronized 代码块的时候，JVM 使用 CAS 操作把线程指针 ID 记录到 Mark Word 当中，并修改标偏向标识，表示当前线程就获得该锁。锁对象变成偏向锁（通过CAS修改对象头里的锁标志位），字面意思是“偏向于第一个获得它的线程”的锁。执行完同步代码块后，线程并不会主动释放偏向锁。
+
+这时线程获得了锁，可以执行同步代码块。当该线程第二次到达同步代码块时会判断此时持有锁的线程是否还是自己（持有锁的线程 ID 也在对象头里），JVM 通过对象的 Mark Word判断：当前线程 ID 还在，说明还持有着这个对象的锁，就可以继续进入临界区工作。由于之前没有释放锁，这里也就不需要重新加锁。 **如果自始至终使用锁的线程只有一个**，很明显偏向锁几乎没有额外开销，性能极高。
+
+综上，JVM 不用和操作系统协商设置 Mutex (争取内核)，它只需要记录下线程 ID，就表示自己获得了当前锁，不用操作系统接入。上述就是偏向锁：在没有其他线程竞争的时候，一直偏向偏心当前线程，当前线程可以一直执行。
+
+> JDK 1.6 之后是默认开启偏向锁的，但是启动时间有延迟，可通过 JVM 命令来开启、关闭偏向锁
+>
+> 开启偏向锁（默认开启，但又延迟）：`-XX:+UseBiasedLocking `
+>
+> 立即开启偏向锁（关闭延迟）：`-XX:BiasedLockingStartupDelay=0`
+>
+> 关闭偏向锁：`-XX:-UseBiasedLocking `
+>
+> 注意：若关闭偏向锁以后，程序默认会进入轻量级锁状态。
+
+```java
+// 验证偏向锁，需关闭偏向锁的延迟，-XX:BiasedLockingStartupDelay=0
+public static void main(String[] args) {
+  	Object object = new Object();
+    new Thread(()->{
+        synchronized (object){
+            System.out.println(ClassLayout.parseInstance(object).toPrintable());
+        }
+    },"thread-").start();
+}
+```
+
+>  OFFSET  SIZE   TYPE DESCRIPTION                               VALUE
+>       0     4        (object header)                           05 e8 06 cf (00000<u>***101***</u> 11101000 00000110 11001111) (-821630971)
+>       4     4        (object header)                           db 7f 00 00 (11011011 01111111 00000000 00000000) (32731)
+>       8     4        (object header)                           e5 01 00 f8 (11100101 00000001 00000000 11111000) (-134217243)
+>      12     4        (loss due to the next object alignment)
+> Instance size: 16 bytes
+>
+> 00000101 后三位 101 对应表中的偏向锁与锁标志位
+
+<table>
+  <tr align="center">
+    <td>锁状态</td>
+    <td colspan="2">54位</td>
+    <td>2位</td>
+    <td>1位</td>
+    <td>4位</td>
+    <td>1位(偏向锁)</td>
+    <td colspan="2">2位(锁标志位)</td>
+  </tr>
+  <tr align="center">
+    <td>偏向锁</td>
+    <td colspan="2">当前线程指针 JavaThread*</td>
+    <td>Epoch</td>
+    <td>unused</td>
+    <td>分代年龄</td>
+    <td>1</td>
+    <td>0</td>
+    <td>1</td>
+  </tr>
+</table>
+
+**偏向锁的撤销**
+
+偏向锁使用一种等到竞争出现才释放锁的机制，只有当其他线程竞争锁时，持有偏向锁的原来线程才会被撤销。
+
+撤销需要等待全局安全点(该时间点上没有字节码正在执行)，同时检查持有偏向锁的线程是否还在执行： 
+
+- 第一个线程正在执行 synchronized 方法(处于同步块)，它还没有执行完，其它线程来抢夺，该偏向锁会被取消掉并出现**锁升级**。此时轻量级锁由原持有偏向锁的线程持有，继续执行其同步代码，而正在竞争的线程会进入自旋等待获得该轻量级锁。
+- 第一个线程执行完成 synchronized 方法(退出同步块)，则将对象头设置成无锁状态并撤销偏向锁，重新偏向 。
+
+<br>
+
+##### 轻量级锁
+
+轻量级锁是为了在线程近乎交替执行同步块时提高性能。
+
+主要目的： 在没有多线程竞争的前提下，通过 CAS 减少重量级锁使用操作系统互斥量产生的性能消耗，说白了先自旋再阻塞。
+
+升级时机： 当关闭偏向锁功能或多线程竞争偏向锁时，会导致偏向锁升级为轻量级锁。
+
+例如线程 A 已经拿到锁，这时线程 B 又来抢该对象的锁，由于该对象的锁已经被线程A拿到，当前该锁已是偏向锁了。而线程 B 在争抢时发现对象头 Mark Word 中的线程 ID 不是线程 B 自己的线程 ID (而是线程 A )，那线程 B 就会进行 CAS 操作，希望能获得锁。此时线程 B 操作中有两种情况：
+
+- **如果锁获取成功**，直接替换 Mark Word 中的线程 ID 为 B 自己的 ID (A → B)。重新偏向于其他线程(即将偏向锁交给其他线程，相当于当前线程"被"释放了锁)，该锁会保持偏向锁状态，A 线程 Over，B 线程上位；
+
+  <table>
+    <tr align="center">
+      <td>锁状态</td>
+      <td colspan="2">54位</td>
+      <td>2位</td>
+      <td>1位</td>
+      <td>4位</td>
+      <td>1位(偏向锁)</td>
+      <td colspan="2">2位(锁标志位)</td>
+    </tr>
+    <tr align="center">
+      <td>偏向锁</td>
+      <td colspan="2">当前线程指针 JavaThread*</td>
+      <td>Epoch</td>
+      <td>unused</td>
+      <td>分代年龄</td>
+      <td>1</td>
+      <td>0</td>
+      <td>1</td>
+    </tr>
+  </table>
+
+- **如果锁获取失败**，则偏向锁升级为轻量级锁，此时轻量级锁由原持有偏向锁的线程持有，继续执行其同步代码，而正在竞争的线程 B 会进入自旋等待获得该轻量级锁。
+
+  <table>
+    <tr align="center">
+      <td>锁状态</td>
+      <td colspan="6">62位</td>
+      <td colspan="2">2位(锁标志位)</td>
+    </tr>
+    <tr align="center">
+      <td>轻量级锁、自旋锁、无锁</td>
+      <td colspan="6">指向线程栈中 Lock Record 的指针</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+  </table>
+
+> 轻量级锁的自旋策略：
+>
+> - Java 6 之前，默认情况下自旋的次数是 10 次。可以通过参数：`-XX:PreBlockSpin=10`来修改。
+> - Java 6 自后，自旋次数采用的是自适应策略。意味着自旋次数不固定，而是根据同一个锁上一次自旋的时间和拥有锁线程的状态来决定的。
+>
+> 轻量级锁与偏向锁的区别是：
+>
+> - 争夺轻量级锁失败时，自旋尝试抢占锁；
+> - 轻量级锁每次退出同步块时，都需要释放锁，而偏向锁时在竞争发生时才释放锁。
+
+<br>
+
+##### 重量级锁
+
+当有大量线程参与锁竞争时，即冲突性很高时，锁就会升级成重量级锁。其锁标志如下表：
+
+<table>
+  <tr align="center">
+    <td>锁状态</td>
+    <td colspan="6">62位</td>
+    <td colspan="2">2位(锁标志位)</td>
+  </tr>
+  <tr align="center">
+    <td>重量级锁</td>
+    <td colspan="6">指向互斥量(重量级锁)的指针</td>
+    <td>1</td>
+    <td>0</td>
+  </tr>
+</table>
+
+```java
+// 测试重量级锁（多线程竞争锁）
+public static void main(String[] args) {
+
+    Object object = new Object();
+    
+    new Thread(()->{
+        synchronized (object){
+            System.out.println(ClassLayout.parseInstance(object).toPrintable());
+        }
+    },"thread-A").start();
+    
+    new Thread(()->{
+        synchronized (object){
+            System.out.println(ClassLayout.parseInstance(object).toPrintable());
+        }
+    },"thread-B").start();
+}
+```
+
+> java.lang.Object object internals:
+>  OFFSET  SIZE   TYPE DESCRIPTION                               VALUE
+>       0     4        (object header)                           fa 5f 01 df (111110*<u>**10**</u>* 01011111 00000001 11011111) (-553558022)
+>       4     4        (object header)                           9f 7f 00 00 (10011111 01111111 00000000 00000000) (32671)
+>       8     4        (object header)                           e5 01 00 f8 (11100101 00000001 00000000 11111000) (-134217243)
+>      12     4        (loss due to the next object alignment)
+> Instance size: 16 bytes
+> Space losses: 0 bytes internal + 4 bytes external = 4 bytes total
+>
+> java.lang.Object object internals:
+>  OFFSET  SIZE   TYPE DESCRIPTION                               VALUE
+>       0     4        (object header)                           fa 5f 01 df (111110<u>***10***</u> 01011111 00000001 11011111) (-553558022)
+>       4     4        (object header)                           9f 7f 00 00 (10011111 01111111 00000000 00000000) (32671)
+>       8     4        (object header)                           e5 01 00 f8 (11100101 00000001 00000000 11111000) (-134217243)
+>      12     4        (loss due to the next object alignment)
+> Instance size: 16 bytes
+>
+> 注意：锁标志位为 ：1 和 0
+
+<br>
+
+##### 各种锁的优缺点
+
+| 锁       | 优点                                                         | 缺点                                           | 适用场景                           |
+| -------- | ------------------------------------------------------------ | ---------------------------------------------- | ---------------------------------- |
+| 偏向锁   | 加锁和解锁不需要额外的消耗，和执行非同步方法相比，仅存在纳秒级的差距 | 如果线程间存在锁竞争，会带来额外的锁撤销的消耗 | 适用于只有一个线程访问同步块的场景 |
+| 轻量级锁 | 竞争的线程不会阻塞，提高了程序的响应速度                     | 对于始终竞争不到锁的线程，其自旋会消耗 CPU     | 追求响应时间，同步块执行速度非常快 |
+| 重量级锁 | 线程竞争不适用自旋，不会消耗 CPU                             | 线程阻塞，响应时间缓慢                         | 追求吞吐量，同步块执行速度较长     |
+
+<br>
+
+#### synchronized 锁升级的过程
+
+先自旋，不行再阻塞。
+
+实际上是把之前的悲观锁(重量级锁)变成在一定条件下使用偏向锁以及使用轻量级(自旋锁CAS)的形式，synchronized 在修饰方法、代码块、字节码上实现方式有很大差异，但是内部实现还是基于对象头的 MarkWord 来实现的。
+
+JDK 1.6 之前 synchronized 使用的是重量级锁；
+
+JDK 1.6 之后进行了优化，拥有了无锁 -> 偏向锁 -> 轻量级锁 -> 重量级锁的升级过程，而不是无论什么情况都使用重量级锁。
+
+- 偏向锁：适用于单线程适用的情况，在不存在锁竞争的时候进入同步方法/代码块则使用偏向锁。
+- 轻量级锁：适用于竞争较不激烈的情况(这和乐观锁的使用范围类似)， 存在竞争时升级为轻量级锁，轻量级锁采用的是自旋锁，如果同步方法/代码块执行时间很短的话，采用轻量级锁虽然会占用 cpu 资源但是相对比使用重量级锁还是更高效。
+- 重量级锁：适用于竞争激烈的情况，如果同步方法/代码块执行时间很长，那么使用轻量级锁自旋带来的性能消耗就比使用重量级锁更严重，这时候就需要升级为重量级锁。
+
+<br>
+
+JIT 编译器对锁的优化
+
+- 锁消除
+
+  ```java
+  /**
+   * 锁消除：
+   * 从 JIT 角度看相当于无视它，synchronized(object) 不存在了，这个锁对象并没有被共用扩散到其它线程使用，
+   * 极端的说就是根本没有加这个锁对象的底层机器码，消除了锁的使用。
+   * 每个线程加锁的对象都不是同一个，相当于多线程各自处理各自的锁对象，没有产生锁竞争，JIT 无视这样的锁。
+   */
+  public class LockClearUPDemo {
+  
+      static Object objectLock = new Object();//正常的
+  
+      public void method(){
+  
+          // 锁消除，JIT 会无视它，synchronized(对象锁)不存在了。不正常的。（每个线程锁的对象都不是同一个）
+          Object object = new Object();
+          synchronized (object){
+              System.out.println("-----hello LockClearUPDemo"+"\t"+object.hashCode()+"\t"+objectLock.hashCode());
+          }
+      }
+  
+      public static void main(String[] args) {
+          LockClearUPDemo lockClearUPDemo = new LockClearUPDemo();
+          for (int i = 0; i < 10; i++) {
+              new Thread(()->{
+                  lockClearUPDemo.method();
+              },"thread-i").start();
+          }
+      }
+  }
+  ```
+
+- 锁粗化
+
+  ```java
+  /**
+   * 锁粗化
+   * 假如方法中首尾相接，前后相邻的都是同一个锁对象，那 JIT 编译器就会把这几个 synchronized 块合并成一个大块，
+   * 加粗加大范围，一次申请锁使用即可，避免次次的申请和释放锁，提升了性能。
+   * 每个线程内的几处加锁，都是加到同一个对象的身上，将几把锁合并成一个大锁。
+   */
+  public class LockBigDemo {
+  
+      static Object objectLock = new Object();
+  
+      public static void main(String[] args) {
+          new Thread(() -> {
+              synchronized (objectLock) {
+                  System.out.println("11111");
+              }
+              synchronized (objectLock) {
+                  System.out.println("22222");
+              }
+              synchronized (objectLock) {
+                  System.out.println("33333");
+              }
+          },"a").start();
+  
+          new Thread(() -> {
+              synchronized (objectLock) {
+                  System.out.println("44444");
+              }
+              synchronized (objectLock) {
+                  System.out.println("55555");
+              }
+              synchronized (objectLock) {
+                  System.out.println("66666");
+              }
+          },"b").start();
+      }
+  }
+  ```
+
+  
 
 ---
 
-## AbstractQueuedSynchronizer(AQS)
+## AQS
 
+AQS 是 AbstractQueuedSynchronizer 的缩写，抽象的队列同步器。存在于 JUC/concurrent/locks 包下。
 
+AQS 是用来构建锁或者其它同步器组件的重量级基础框架及整个JUC体系的基石，通过内置的 FIFO 队列来完成资源获取线程的排队工作，并通过一个 int 类变量，表示持有锁的状态。
+
+<img src="img/AQS队列图示.jpg" style="zoom: 50%;" />
+
+<br>
+
+#### 锁与同步器的关系：
+
+- 锁，面向锁的使用者：定义了程序员和锁交互的使用层 API，隐藏了实现细节，直接调用。
+- 同步器，面向锁的实现者，比如 Java 开发大神 DougLee，提出统一规范并简化了锁的实现，屏蔽了同步状态管理、阻塞线程排队和通知、唤醒机制等。
+
+<br>
+
+抢到资源的线程直接使用处理业务，抢不到资源的必然涉及一种排队等候机制。抢占资源失败的线程继续去等待(类似银行业务办理窗口都满了，暂时没有受理窗口的顾客只能去候客区排队等候)，但等候线程仍然保留获取锁的可能且获取锁流程仍在继续(候客区的顾客也在等着叫号，轮到了再去受理窗口办理业务)。既然说到了排队等候机制，那么就一定会有某种队列形成，这样的队列是什么数据结构呢？
+
+如果共享资源被占用，就需要一定的阻塞等待唤醒机制来保证锁分配。这个机制主要用的是 CLH 队列的变体实现的，将暂时获取不到锁的线程加入到队列中，这个队列就是 AQS 的抽象表现。它将请求共享资源的线程封装成队列的结点（**Node**），通过 CAS、自旋以及 LockSupport.park() 的方式，维护 state 变量的状态，使并发达到同步的效果。
+
+<br>
+
+#### AQS 的总体介绍
+
+AQS 使用一个 volatile 的 int 类型的成员变量来表示同步状态，通过内置的 FIFO 队列来完成资源获取的排队工作，将每条要去抢占资源的线程封装成一个 Node 节点，来实现锁的分配，通过 CAS 完成对 state 值的修改。
+
+#### AQS 主要属性
+
+```java
+public abstract class AbstractQueuedSynchronizer
+    extends AbstractOwnableSynchronizer
+    implements java.io.Serializable {
+  
+  // 队列中，每个排队的个体就是一个 Node
+  static final class Node{
+    // 表示线程以共享的模式等待锁
+    static final Node SHARED = new Node();
+    // 表示线程正在以独占的方式等待锁
+    static final Node EXCLUSIVE = null;
+    
+    /**
+     * 队列中线程的等待状态，初始值为 0。
+     * waitStatus 的状态还有：
+     * CANCELLED =  1：表示线程获取锁的请求已经被注销了
+     * SIGNAL    = -1：表示线程已经准备好了，就等资源释放了
+     * CONDITION = -2：表示节点在等待队列中，节点线程等待唤醒
+     * PROPAGATE = -3：当前线程处在 SHARED 情况下，该字段才会使用
+     */
+    volatile int waitStatus;
+    // 前置节点
+    volatile Node prev;
+    // 后继节点
+    volatile Node next;
+    // 处于该节点的线程
+    volatile Thread thread;
+    // 指向下一个处于 CONDITION 状态的节点
+    Node nextWaiter;
+  }
+  
+  // 头节点
+  private transient volatile Node head;
+  // 尾结点
+  private transient volatile Node tail;
+  
+  // 同步状态变量。volatile 修饰
+  private volatile int state;
+  
+}
+```
+
+#### AQS 内部体系架构
+
+<img src="img/AQS内部体系架构.jpg" style="zoom: 25%;" />
+
+#### AQS 队列的基本结构
+
+<img src="img/AQS队列基本结构.jpeg" style="zoom: 50%;" />
+
+<br>
+
+#### ReentrantLock 源码解读
+
+```java
+// ReentrantLock 构造，可以是公平锁，也可以是非公平锁，默认是非公平锁。
+public ReentrantLock(boolean fair) {
+  sync = fair ? new FairSync() : new NonfairSync();
+}
+```
+
+```java
+// 👇🏻：非公平锁 lock()方法 → tryAcquire()
+final boolean nonfairTryAcquire(int acquires) {
+  final Thread current = Thread.currentThread();
+  int c = getState();
+  if (c == 0) {
+    if (compareAndSetState(0, acquires)) {
+      setExclusiveOwnerThread(current);
+      return true;
+    }
+  }
+  else if (current == getExclusiveOwnerThread()) {
+    int nextc = c + acquires;
+    if (nextc < 0) // overflow
+      throw new Error("Maximum lock count exceeded");
+    setState(nextc);
+    return true;
+  }
+  return false;
+}
+
+// 👇🏻：公平锁 lock()方法 → tryAcquire()
+protected final boolean tryAcquire(int acquires) {
+  final Thread current = Thread.currentThread();
+  int c = getState();
+  if (c == 0) {
+    if (!hasQueuedPredecessors() &&
+        compareAndSetState(0, acquires)) {
+      setExclusiveOwnerThread(current);
+      return true;
+    }
+  }
+  else if (current == getExclusiveOwnerThread()) {
+    int nextc = c + acquires;
+    if (nextc < 0)
+      throw new Error("Maximum lock count exceeded");
+    setState(nextc);
+    return true;
+  }
+  return false;
+}
+```
+
+> 对比公平锁和非公平锁的 tryAcquire() 方法的实现代码，其实差别就在于非公平锁获取锁时比公平锁中少了一个判断 !hasQueuedPredecessors()
+>
+> hasQueuedPredecessors() 中判断了是否需要排队，导致公平锁和非公平锁的差异如下：
+>
+> - 公平锁：公平锁按照先来先到，线程在获取锁时，如果这个锁的等待队列中已经有线程在等待，那么当前线程就会进入等待队列中；
+> - 非公平锁：不管是否有等待队列，如果可以获取锁，则立刻占有锁对象。也就是说队列的第一个排队线程在 unpark() 之后还是需要竞争锁（存在线程竞争的情况下）
+
+<br>
+
+```java
+// 👇🏻 以非公平锁为例：
+static final class NonfairSync extends Sync {
+    private static final long serialVersionUID = 7316153563782823691L;
+
+    
+    final void lock() {
+        if (compareAndSetState(0, 1))
+          	// 第一个线程抢占
+            setExclusiveOwnerThread(Thread.currentThread());
+        else
+          	// 第二个及以后的线程抢占
+            acquire(1);
+    }
+
+    protected final boolean tryAcquire(int acquires) {
+        return nonfairTryAcquire(acquires);
+    }
+}
+
+// 👇🏻 acquire(1)，接下来会有三条分支：1.tryAcquire(arg)，2.addWaiter(Node.EXCLUSIVE)，3.acquireQueued(……)
+public final void acquire(int arg) {
+    if (!tryAcquire(arg) &&
+        acquireQueued(addWaiter(Node.EXCLUSIVE), arg))
+        selfInterrupt();
+}
+
+// 👇🏻 1.tryAcquire(arg) → nonfairTryAcquire()
+final boolean nonfairTryAcquire(int acquires) {
+    final Thread current = Thread.currentThread();
+  	// 获取当前同步状态
+    int c = getState();
+    if (c == 0) {
+      	// 同步状态为 0，说明目前无需排队，直接修改状态为 1，并将自己的线程存入
+        if (compareAndSetState(0, acquires)) {
+            setExclusiveOwnerThread(current);
+            return true;
+        }
+    }
+  	// 同步状态不为 0，检测持有锁的线程是否为当前线程自己
+    else if (current == getExclusiveOwnerThread()) {
+      	// 当前线程自己持有锁，将同步状态加一
+        int nextc = c + acquires;
+        if (nextc < 0) // overflow
+            throw new Error("Maximum lock count exceeded");
+      	// 重新设置同步状态
+        setState(nextc);
+        return true;
+    }
+    return false;
+}
+```
+
+<br>
+
+```java
+// 👇🏻 2.addWaiter(Node.EXCLUSIVE)
+private Node addWaiter(Node mode) {
+    Node node = new Node(Thread.currentThread(), mode);
+    // Try the fast path of enq; backup to full enq on failure
+    Node pred = tail;
+    if (pred != null) {
+        node.prev = pred;
+        if (compareAndSetTail(pred, node)) {
+            pred.next = node;
+            return node;
+        }
+    }
+    enq(node);
+    return node;
+}
+
+// 👇🏻 2.addWaiter(Node.EXCLUSIVE) → enq()
+private Node enq(final Node node) {
+    for (;;) {
+        Node t = tail;
+        if (t == null) { // Must initialize
+            if (compareAndSetHead(new Node()))
+              	// 第二个线程进来，将双向链表中第一个节点设置为虚节点，不存储任何信息，只是占位
+                tail = head;
+        } else {
+          	// 第三个及以后线程进来处理
+            node.prev = t;
+            if (compareAndSetTail(t, node)) {
+                t.next = node;
+                return t;
+            }
+        }
+    }
+}
+```
+
+> 双向链表中，第一个节点为虚节点(也叫哨兵节点)，其实并不存储任何信息，只是占位。真正的第一个有数据的节点，是从第二个节点开始的。
+
+<br>
+
+```java
+// 👇🏻 3.acquireQueued(……)
+final boolean acquireQueued(final Node node, int arg) {
+    boolean failed = true;
+    try {
+        boolean interrupted = false;
+        for (;;) {
+            final Node p = node.predecessor();
+            if (p == head && tryAcquire(arg)) {
+                setHead(node);
+                p.next = null; // help GC
+                failed = false;
+                return interrupted;
+            }
+          	// 线程再次获取锁失败，会执行 shouldParkAfterFailedAcquire()
+            if (shouldParkAfterFailedAcquire(p, node) &&
+                parkAndCheckInterrupt())
+                interrupted = true;
+        }
+    } finally {
+        if (failed)
+            cancelAcquire(node);
+    }
+}
+
+// 👇🏻 shouldParkAfterFailedAcquire()
+private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
+  	// 获取前驱节点的状态  
+  	int ws = pred.waitStatus;
+  	// 如果是 SIGNAL 状态，即等待被占用的资源释放，直接返回 true，接下来调用 parkAndCheckInterrupt()，用于将当前线程挂起。
+    if (ws == Node.SIGNAL)
+        /*
+         * This node has already set status asking a release
+         * to signal it, so it can safely park.
+         */
+        return true;
+  	// ws > 0，说明是 CANCELLED 状态
+    if (ws > 0) {
+        /*
+         * Predecessor was cancelled. Skip over predecessors and
+         * indicate retry.
+         */
+      	// 循环判断前驱节点是否也是 CANCELLED 状态，忽略该状态的节点，重新链接队列
+        do {
+            node.prev = pred = pred.prev;
+        } while (pred.waitStatus > 0);
+        pred.next = node;
+    } else {
+        /*
+         * waitStatus must be 0 or PROPAGATE.  Indicate that we
+         * need a signal, but don't park yet.  Caller will need to
+         * retry to make sure it cannot acquire before parking.
+         */
+      	// 将当前节点的前驱节点设置为 SIGNAL 状态，用于后续唤醒操作
+      	// 程序第一次执行到这返回 false，还会进行外层第二次循环？？？？
+        compareAndSetWaitStatus(pred, ws, Node.SIGNAL);
+    }
+    return false;
+}
+
+// 👇🏻 parkAndCheckInterrupt()：用于将当前线程挂起。因为当前节点的前驱节点的 waitStatus 是 SIGNAL状态 
+private final boolean parkAndCheckInterrupt() {
+  	// 将当前线程挂起，程序不会继续向下执行
+    LockSupport.park(this);
+  	/**
+  	 * 根据 park() 方法 API 描述，程序在下面三种情况下会被唤醒，继续向下执行。
+  	 * 1.被 unpark
+  	 * 2.被中断 interrupt
+  	 * 3.其它不合逻辑的返回，才会继续向下执行
+  	 *
+  	 * 因上述三种情况，程序执行至此，返回当前线程的中断状态，并清空中断状态，
+  	 * 如果是被中断，则会返回 true
+  	 */
+    return Thread.interrupted();
+}
+```
+
+<br>
+
+```java
+// 👇🏻：非公平锁 unlock()方法 → unparkSuccessor()
+private void unparkSuccessor(Node node) {
+    /*
+     * If status is negative (i.e., possibly needing signal) try
+     * to clear in anticipation of signalling.  It is OK if this
+     * fails or if status is changed by waiting thread.
+     */
+    int ws = node.waitStatus;
+    if (ws < 0)
+        compareAndSetWaitStatus(node, ws, 0);
+
+    /*
+     * Thread to unpark is held in successor, which is normally
+     * just the next node.  But if cancelled or apparently null,
+     * traverse backwards from tail to find the actual
+     * non-cancelled successor.
+     */
+    Node s = node.next;
+    if (s == null || s.waitStatus > 0) {
+        s = null;
+        for (Node t = tail; t != null && t != node; t = t.prev)
+            if (t.waitStatus <= 0)
+                s = t;
+    }
+    if (s != null)
+      	// unpark() 唤醒当前线程
+        LockSupport.unpark(s.thread);
+}
+```
 
 ---
 
-## ReentrantLock、ReentrantReadWriteLock、StampedLock讲解
+## Java 锁
+
+#### 8 锁案例
 
 
 
----
+<br>
+
+#### 乐观锁与悲观锁
+
+- 乐观锁：认为自己在使用数据的时候不会有其它的线程来修改数据，所以不会加锁，只是在更新数据的时候取判断之前有没有别的线程更新了这个数据。如果这个数据没有被更新，当前线程将自己修改的数据成功写入；如果数据已经被其它线程更新了，则根据不同的实现方式，执行不同的操作。**乐观锁在 Java 中是通过无锁编程来实现的，最常采用的方式是 CAS 算法，Java 原子类中的递增操作就是通过 CAS 自旋实现的。**
+- 悲观锁：认为自己在使用数据的时候一定有其它的线程来修改数据，因此在获取数据的时候会先加锁，确保数据不会被其它线程修改。synchronize 关键字和 Lock 的实现类都属于悲观锁。适合写操作比较多的场景，先加锁可以保证写操作时数据正确。**显式加锁之后再操作同步资源。**
+
+<br>
+
+#### 公平锁和非公平锁
+
+FIFO（First In First Out） 属于公平锁，否则属于非公平锁。
+
+按序排队属于公平锁，就是判断同步队列是否还有先驱节点的存在，如果没有，才能获取到锁，如果有，等待先驱节点释放锁。
+
+先占先得属于非公平锁。
+
+默认采用非公平锁的原因：
+
+1. 恢复挂起的线程到真正锁的获取是有时间差的，从开发人员的角度来看这个时间微乎其微，但从 CPU 的角度看，这个时间差是很明显的，所**以非公平锁能够更充分利用 CPU 的时间片，尽量减少 CPU 空间状态时间；**
+2. 使用多线程很重要的考量点是线程切换的开销，当采用非公平锁时，当1个线程请求锁获取同步状态，然后释放同步状态，因为不需要考虑是否还有前驱节点，所以刚释放锁的线程在此刻再次获取同步状态的概率就变得非常大，所以就减少了线程的开销。
+3. 如果使用的是公平锁，虽然保证了排队的公平性，但可能导致长时间在排队等待获取锁，就造成了“锁饥饿”。
+4. 如果为了提高吞吐量，使用非公平锁很合适，因为减少了很多线程的切换时间
+
+<br>
+
+#### 可重入锁
+
+可重入锁又称递归锁。是指同一个线程在外层方法获取到锁的时候，在进入该线程的内层方法时，就会自动获取到锁（前提是锁对象是同一个对象），不会因为之前已经获取到的锁没有释放而阻塞。Java 中 ReentrantLock 和 synchronized 都是可重入锁，可重入锁的一个优点就是可一定程度上避免死锁。
+
+可重入锁的种类：
+
+1. 隐式锁；synchronized 关键字修饰的锁。
+
+   > synchronized 可重入锁的实现原理：
+   >
+   > 1. 每个锁对象拥有一个锁计数器和一个指向持有该锁的线程的指针。
+   > 2. 当执行 monitorenter 时，如果目标锁对象的计数器为零，那么说明它没有被其它线程所持有，Java 虚拟机会将该锁对象的持有线程设置为当前线程，并且将计数器加一
+   > 3. 当执行 monitorenter 时，如果目标锁对象的计数器不为零，且锁对象持有的线程是当前线程，那么 Java 虚拟机可以将其计数器加一，否则需要等待，直至持有线程释放该锁。
+   > 4. 当执行 monitorexit 时，Java 虚拟机需将锁对象的计数器减一，当计数器为零时，代表锁已经被释放了。
+
+2. 显式锁：Lock 的实现类，例如 ReentrantLock。
+
+   > lock.lock()：加锁
+   >
+   > lock.unlock()：解锁
+   >
+   > 显式锁的加锁与解锁需成对出现，即加几次锁就要解几次锁。
+
+<br>
+
+#### 死锁
+
+死锁是指两个或以上的线程在执行过程中，因争夺资源而造成的一种**互相等待的现象**，若无外力干涉，那它们将无法推进下去，如果系统资源充足，进程的资源请求能够得到满足，死锁出现的可能性就低，否则就会因争夺有限的资源而陷入死锁。
+
+```java
+public static void main(String[] args) {
+
+    final Object objectLockA = new Object();
+    final Object objectLockB = new Object();
+
+    new Thread(() -> {
+        synchronized (objectLockA)
+        {
+            System.out.println(Thread.currentThread().getName()+"\t"+"自己持有A，希望获得B");
+            //暂停几秒钟线程
+            try { TimeUnit.SECONDS.sleep(1); } catch (InterruptedException e) { e.printStackTrace(); }
+            synchronized (objectLockB)
+            {
+                System.out.println(Thread.currentThread().getName()+"\t"+"A-------已经获得B");
+            }
+        }
+    },"A").start();
+
+    new Thread(() -> {
+        synchronized (objectLockB)
+        {
+            System.out.println(Thread.currentThread().getName()+"\t"+"自己持有B，希望获得A");
+            //暂停几秒钟线程
+            try { TimeUnit.SECONDS.sleep(1); } catch (InterruptedException e) { e.printStackTrace(); }
+            synchronized (objectLockA)
+            {
+                System.out.println(Thread.currentThread().getName()+"\t"+"B-------已经获得A");
+            }
+        }
+    },"B").start();
+
+}
+```
+
+死锁的排查：
+
+- 命令方式：
+
+  > jps -l：查找所有 Java 进程
+  >
+  > jstack 进程编号：查看该进程详情
+
+- 图形化工具方式：jconsole
+
+<br>
+
+#### 读写锁
+
+**读写锁**：ReentrantReadWriteLock 并不是真正意义上的读写分离，它只允许读读共存，而读写和写写依然是互斥的。大多实际场景是“读/读”线程间并不存在互斥关系，只有"读/写"线程或"写/写"线程间的操作需要互斥的。因此引入 ReentrantReadWriteLock。
+
+一个 ReentrantReadWriteLock 同时只能存在一个写锁但是可以存在多个读锁，但不能同时存在写锁和读锁。也即一个资源可以被多个读操作访问或一个写操作访问，但两者不能同时进行。只有在读多写少情境之下，读写锁才具有较高的性能体现。
+
+<br>
+
+##### 锁降级
+
+锁的严苛程度变强叫升级，反之叫降级
+
+ReentrantReadWriteLock 的特性
+
+| 特性         | 说明                                                         |
+| ------------ | ------------------------------------------------------------ |
+| 公平性选择   | 支持非公平（默认）和公平锁获取方式，吞吐量还是非公平优于公平 |
+| 重进入       | 该锁支持重进入，以读写线程为例：读线程在获取了读锁之后，能够再次获取读锁，而写线程在获取了写锁之后，能够再次获取写锁，同时也可以获取读锁 |
+| 写锁可降级   | 遵循获取写锁、获取读锁、再释放写锁的次序，写锁能够降级为读锁 |
+| 读锁不可升级 | 当读锁被使用时，有线程尝试获取写锁，该写锁线程会被阻塞。需要先释放读锁后，才可获取写锁。 |
+
+> 写锁和读锁是互斥的（这里的互斥是指线程间的互斥，当前线程可以获取到写锁又获取到读锁，但是获取到了读锁不能继续获取写锁），这是因为读写锁要保持写操作的可见性。因为，如果允许读锁在被获取的情况下对写锁的获取，那么正在运行的其他读线程无法感知到当前写线程的操作。 
+>
+> *分析读写锁ReentrantReadWriteLock*，会发现它有个潜在的问题：读锁全完，写锁有望；写锁独占，读写全堵；
+>
+> - 如果有线程正在读，写线程需要等待读线程释放锁后才能获取写锁，见前面 Case《code 演示 LockDownGradingDemo》。即 ReadWriteLock 读的过程中不允许写，只有等待线程都释放了读锁，当前线程才能获取**写锁**，也就是写入必须等待，这是一种**悲观的读锁**。
+
+<br>
+
+##### 锁降级源码
+
+```java
+// ReentrantWriteReadLock 中关于锁降级的源码
+class CachedData {
+  Object data;
+  // volatile 修饰 cacheValid，保证了 cacheValid 的可见性
+  volatile boolean cacheValid;
+  final ReentrantReadWriteLock rwl = new ReentrantReadWriteLock();
+
+  void processCachedData() {
+    // 获取读锁
+    rwl.readLock().lock();
+    if (!cacheValid) {
+      // 在获取写锁之前必须释放读锁。Must release read lock before acquiring write lock
+      // 释放读锁
+      rwl.readLock().unlock();
+      // 获取写锁
+      rwl.writeLock().lock();
+      try {
+        // 重新检查状态，因为另一个线程可能在我们之前获取了写锁定并更改了状态。
+        // Recheck state because another thread might have acquired write lock and changed state before we did.
+        if (!cacheValid) {
+          data = ...
+            // 修改 cacheValid 的值
+            cacheValid = true;
+        }
+        // 通过在释放写锁定之前获取读锁定，进行降级。Downgrade by acquiring read lock before releasing write lock
+        // 获取读锁（在写锁释放之前）
+        rwl.readLock().lock();
+      } finally {
+        // 释放写锁，但此时还保持读锁。
+        rwl.writeLock().unlock(); // Unlock write, still hold read
+      }
+    }
+
+    try {
+      use(data);
+    } finally {
+      // 释放读锁
+      rwl.readLock().unlock();
+    }
+  }
+}}
+```
+
+> 步骤说明：
+>
+> - 代码中声明了一个 volatile 类型的 cacheValid 变量，保证其可见性。
+> - 首先获取读锁，如果 cache 不可用，则释放读锁，获取写锁，在更改数据之前，再检查一次 cacheValid 的值，然后修改数据，将 cacheValid 置为 true，然后在释放写锁前获取读锁；此时，cache 中数据可用，处理 cache 中数据，最后释放读锁。这个过程就是一个完整的锁降级的过程，目的是保证数据可见性。
+>
+> **如果违背锁降级的步骤** 
+>
+> - 如果当前的线程 C 在修改完 cache 中的数据后，没有获取读锁而是直接释放了写锁，那么假设此时另一个线程 D 获取了写锁并修改了数据，那么 C 线程无法感知到数据已被修改，则数据出现错误。
+>
+> **如果遵循锁降级的步骤** 
+>
+> - 线程 C 在释放写锁之前获取读锁，那么线程 D 在获取写锁时将被阻塞，直到线程 C 完成数据处理过程，释放读锁。这样可以保证返回的数据是这次更新的数据，该机制是专门为了缓存设计的。
+
+<br>
+
+#### 邮戳锁
+
+邮戳锁 StampedLock，是 JDK1.8 中新增的一个读写锁，是对 JDK1.5 中的读写锁 ReentrantReadWriteLock 的优化。stamp（戳记，long类型），代表了锁的状态。当stamp返回零时，表示线程获取锁失败。并且，当释放锁或者转换锁的时候，都要传入最初获取的 stamp 值。
+
+##### 锁饥饿
+
+ReentrantReadWriteLock 实现了读写分离，但是一旦读操作比较多的时候，想要获取写锁就变得比较困难了，假如当前 1000 个线程，999 个读，1 个写，有可能 999 个读取线程长时间抢到了锁，那 1 个写线程就悲剧了，因为当前有可能会一直存在读锁，而无法获得写锁，根本没机会写。	
+
+解决锁饥饿问题，使用“公平”策略可以一定程度上缓解这个问题（new ReentrantReadWriteLock(true)），但是“公平”策略是以牺牲系统吞吐量为代价的。
+
+还可以使用邮戳锁 StampedLock 解决锁饥饿问题。
+
+<br>
+
+##### StampedLock 的特点
+
+- 所有获取锁的方法，都返回一个邮戳（Stamp），Stamp 为零表示获取失败，其余都表示成功；
+- 所有释放锁的方法，都需要一个邮戳（Stamp），这个 Stamp 必须是和成功获取锁时得到的 Stamp 一致；
+- StampedLock 是不可重入的，危险(如果一个线程已经持有了写锁，再去获取写锁的话就会造成死锁)
+
+<br>
+
+##### StampedLock 三种访问模式
+
+- Reading（读模式）：功能和 ReentrantReadWriteLock 的读锁类似
+- Writing（写模式）：功能和 ReentrantReadWriteLock的写锁类似
+- Optimistic reading（乐观读模式）：无锁机制，类似于数据库中的乐观锁，支持读写并发，很乐观认为读取时没人修改，假如被修改再实现升级为悲观读模式。
+
+<br>
+
+##### StampedLock 的缺点
+
+- StampedLock 不支持重入，没有Re开头
+- StampedLock 的悲观读锁和写锁都不支持条件变量（Condition）
+- 使用 StampedLock 时一定不要调用中断操作，即不要调用 interrupt() 方法。如果需要支持中断功能，一定使用可中断的悲观读锁 readLockInterruptibly() 和写锁writeLockInterruptibly()。
+
+<br>
+
+##### StampedLock 测试
+
+```java
+public class StampedLockDemo {
+
+    static int number = 37;
+    static StampedLock stampedLock = new StampedLock();
+
+    public static void main(String[] args) {
+
+        StampedLockDemo resource = new StampedLockDemo();
+
+        new Thread(() -> {
+            // 悲观读(读写互斥，读的过程中不允许写锁介入)
+            resource.read();
+
+            // 乐观读(读的过程中也允许获取写锁介入)
+            // resource.tryOptimisticRead();
+        },"readThread").start();
+
+        // 2秒钟时乐观读失败，6秒钟乐观读取成功resource.tryOptimisticRead();，修改切换演示
+        //try { TimeUnit.SECONDS.sleep(6); } catch (InterruptedException e) { e.printStackTrace(); }
+
+        new Thread(() -> {
+            resource.write();
+        },"writeThread").start();
+    }
+
+    public void write() {
+        long stamp = stampedLock.writeLock();
+        System.out.println(Thread.currentThread().getName()+"\t"+"=====写线程准备修改");
+
+        try {
+            number = number + 13;
+        }catch (Exception e){
+            e.printStackTrace();
+        }finally {
+            stampedLock.unlockWrite(stamp);
+        }
+        System.out.println(Thread.currentThread().getName()+"\t"+"=====写线程结束修改");
+    }
+
+    //悲观读
+    public void read() {
+        long stamp = stampedLock.readLock();
+        System.out.println(Thread.currentThread().getName()+"\t come in readlock block,4 seconds continue...");
+        //暂停几秒钟线程
+        for (int i = 0; i <4 ; i++) {
+            try { TimeUnit.SECONDS.sleep(1); } catch (InterruptedException e) { e.printStackTrace(); }
+            System.out.println(Thread.currentThread().getName()+"\t 正在读取中......");
+        }
+
+        try {
+            int result = number;
+            System.out.println(Thread.currentThread().getName()+"\t"+" 获得成员变量值result：" + result);
+            System.out.println("写线程没有修改值，因为 stampedLock.readLock() 读的时候，不可以写，读写互斥");
+        }catch (Exception e){
+            e.printStackTrace();
+        }finally {
+            stampedLock.unlockRead(stamp);
+        }
+    }
+
+    // 乐观读
+    public void tryOptimisticRead() {
+        long stamp = stampedLock.tryOptimisticRead();
+        int result = number;
+        // 间隔 4 秒钟，我们很乐观的认为没有其他线程修改过 number 值，实际靠判断。
+        System.out.println("4 秒前 stampedLock.validate 值(true：无修改，false：有修改)"+"\t"+stampedLock.validate(stamp));
+        for (int i = 1; i <=4 ; i++) {
+            try { TimeUnit.SECONDS.sleep(1); } catch (InterruptedException e) { e.printStackTrace(); }
+            System.out.println(Thread.currentThread().getName()+"\t 正在读取中......"+i+
+                    " 秒后 stampedLock.validate 值(true：无修改，false：有修改)"+"\t"
+                    +stampedLock.validate(stamp));
+        }
+        if(!stampedLock.validate(stamp)) {
+            System.out.println("有人动过--------存在写操作！");
+            // 重新获取(悲观)读锁
+            stamp = stampedLock.readLock();
+            try {
+                System.out.println("从乐观读 升级为 悲观读");
+                result = number;
+                System.out.println("重新悲观读锁通过获取到的成员变量值 result：" + result);
+            }catch (Exception e){
+                e.printStackTrace();
+            }finally {
+                stampedLock.unlockRead(stamp);
+            }
+        }
+        System.out.println(Thread.currentThread().getName()+"\t finally value: "+result);
+    }
+}
+```
 
 
 
