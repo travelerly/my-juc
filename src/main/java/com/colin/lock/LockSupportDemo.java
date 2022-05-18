@@ -13,9 +13,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class LockSupportDemo {
 
     public static void main(String[] args) {
-
-
-
+        lockSupportApiTest();
     }
 
     // LockSupport 类的 park() 和 unpark() 方法测试
@@ -39,7 +37,7 @@ public class LockSupportDemo {
         System.out.println(Thread.currentThread().getName()+"   -----LockSupport.unparrk() invoked over");
     }
 
-    // condition 类的 await() 和 signal() 方法测试
+    // Condition 类的 await() 和 signal() 方法测试
     private static void conditionApiDemo() {
         /**
          * Condition 类的 await()、signal() 方法分别是阻塞和唤醒线程

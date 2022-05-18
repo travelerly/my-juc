@@ -114,8 +114,6 @@ public interface BiConsumer<T, U> {
 
 <img src="img/FutureTask.jpg" alt="FutureTask" style="zoom:33%;" />
 
-> A Future represents the result of an asynchronous computation. Methods are provided to check if the computation is complete, to wait for its completion, and to retrieve the result of the computation. The result can only be retrieved using method get when the computation has completed, blocking if necessary until it is ready. Cancellation is performed by the cancel method. Additional methods are provided to determine if the task completed normally or was cancelled. Once a computation has completed, the computation cannot be cancelled. If you would like to use a Future for the sake of cancellability but not provide a usable result, you can declare types of the form Future<?> and return null as a result of the underlying task.
->
 > Future 表示异步计算的结果。提供了检查计算是否完成、等待计算完成以及检索计算结果的方法。结果只能在计算完成时使用方法 get 检索，必要时阻塞直到准备就绪。取消是通过 cancel 方法执行的。还提供了其他方法来确定任务是否正常完成或取消。一旦计算完成，就不能取消计算。如果您希望为了可取消性而使用 Future，但是没有提供可用的结果，那么可以声明 Future < ? > 表单的类型然后返回 null 作为底层任务的结果。
 >
 > FutureTask 的 get() 方法，是一个阻塞方法。一旦调用 get() 方法，不管是否计算完成，都会导致阻塞。
@@ -290,8 +288,103 @@ CompletableFuture：
    // 计算结果存在依赖关系，这两个线程串行化（当前步骤发生异常，不走下一步，哪步出错，就停在哪步）
    public <U> CompletableFuture<U> thenApply;
    
+   // 计算结果存在依赖关系，这两个线程串行化（当前步骤发生异常，不走下一步，哪步出错，就停在哪步）
+   private static void thenApplyTest() {
+       // 当一个线程依赖另一个线程时用 thenApply 方法来把这两个线程串行化,
+       CompletableFuture.supplyAsync(() -> {
+           //暂停几秒钟线程
+           try { 
+               TimeUnit.SECONDS.sleep(1); 
+           } catch (InterruptedException e) { 
+               e.printStackTrace(); 
+           }
+           System.out.println("111");
+           return 1024;
+       }).thenApply(f -> {
+           System.out.println("222");
+           return f + 1;
+       }).thenApply(f -> {
+           int age = 10/0; // 异常情况：哪步出错就停在哪步。
+           System.out.println("333");
+           return f + 1;
+       }).whenCompleteAsync((v,e) -> {
+           System.out.println("*****v: "+v);
+       }).exceptionally(e -> {
+           e.printStackTrace();
+           return null;
+       });
+   
+       System.out.println("-----主线程结束，END");
+   
+       // 主线程不要立刻结束，否则CompletableFuture默认使用的线程池会立刻关闭:
+       try { 
+           TimeUnit.SECONDS.sleep(2); 
+       } catch (InterruptedException e) { 
+           e.printStackTrace(); 
+       }
+   
+       /**
+        * 正常结果
+        * -----主线程结束，END
+        * 111
+        * 222
+        * 333
+        * *****v: 1026
+        */
+   
+       /**
+        * 异常结果
+        * -----主线程结束，END
+        * 111
+        * 222
+        * *****v: null
+        * java.util.concurrent.CompletionException: java.lang.ArithmeticException: / by zero
+        */
+   }
+   
    // 计算结果存在依赖关系，这两个线程串行化（当前步骤发生异常，携带异常参数继续走下一步）
    public <U> CompletableFuture<U> handle;
+   
+   // 计算结果存在依赖关系，这两个线程串行化（当前步骤发生异常，携带异常参数继续走下一步）
+   private static void handleTest() {
+       //当一个线程依赖另一个线程时用 handle 方法来把这两个线程串行化,
+       // 异常情况：有异常也可以往下一步走，根据带的异常参数可以进一步处理
+       CompletableFuture.supplyAsync(() -> {
+           //暂停几秒钟线程
+           try { 
+               TimeUnit.SECONDS.sleep(1);
+           } catch (InterruptedException e) { 
+               e.printStackTrace(); }
+           System.out.println("111");
+           return 1024;
+       }).handle((f,e) -> {
+           int age = 10/0;
+           System.out.println("222");
+           return f + 1;
+       }).handle((f,e) -> {
+           System.out.println("333");
+           return f + 1;
+       }).whenCompleteAsync((v,e) -> {
+           System.out.println("*****v: "+v);
+       }).exceptionally(e -> {
+           e.printStackTrace();
+           return null;
+       });
+   
+       System.out.println("-----主线程结束，END");
+   
+       // 主线程不要立刻结束，否则CompletableFuture默认使用的线程池会立刻关闭:
+       try { TimeUnit.SECONDS.sleep(2); } catch (InterruptedException e) { e.printStackTrace(); }
+   
+       /**
+        * 异常结果
+        * -----主线程结束，END
+        * 111
+        * 333
+        * *****v: null
+        * java.util.concurrent.CompletionException: java.lang.NullPointerException
+        */
+   }
    ```
 
    > whenComplete 和 whenCompleteAsync 的区别：
@@ -311,6 +404,25 @@ CompletableFuture：
    
    // 任务 A 执行完毕后执行 B，B 需要 A 的结果，同时任务 B 有返回值
    public <U> CompletableFuture<U> thenApply;
+   
+   // 任务顺序执行
+   private static void thenTest() {
+       // 任务 A 执行完毕后执行 B，并且 B 不需要 A 的结果
+       System.out.println(CompletableFuture.supplyAsync(() -> "resultA").thenRun(() -> {}).join());
+   
+       // 任务 A 执行完毕后执行 B，B 需要 A 的结果，但是任务 B 无返回值
+       System.out.println(CompletableFuture.supplyAsync(() -> "resultA").thenAccept(resultA -> {}).join());
+   
+       // 任务 A 执行完毕后执行 B，B 需要 A 的结果，同时任务 B 有返回值
+       System.out.println(CompletableFuture.supplyAsync(() -> "resultA").thenApply(resultA -> resultA + " resultB").join());
+   
+       /**
+        * 执行结果：
+        * null
+        * null
+        * resultA resultB
+        */
+   }
    ```
 
 4. 对计算速度进行选用
@@ -318,6 +430,36 @@ CompletableFuture：
    ```java
    // 选取运行快的任务进行计算
    public <U> CompletableFuture<U> applyToEither;
+   
+   // 对计算速度进行选用，选取运行快的任务进行计算
+   private static void applyToEitherTest() throws InterruptedException, ExecutionException {
+       CompletableFuture<Integer> completableFuture1 = CompletableFuture.supplyAsync(() -> {
+           System.out.println(Thread.currentThread().getName() + "\t" + "---come in ");
+           //暂停几秒钟线程
+           try { TimeUnit.SECONDS.sleep(2); } catch (InterruptedException e) { e.printStackTrace(); }
+           return 10;
+       });
+   
+       CompletableFuture<Integer> completableFuture2 = CompletableFuture.supplyAsync(() -> {
+           System.out.println(Thread.currentThread().getName() + "\t" + "---come in ");
+           try { TimeUnit.SECONDS.sleep(3); } catch (InterruptedException e) { e.printStackTrace(); }
+           return 20;
+       });
+   
+       CompletableFuture<Integer> thenCombineResult = completableFuture1.applyToEither(completableFuture2,f -> {
+           System.out.println(Thread.currentThread().getName() + "\t" + "---come in ");
+           return f + 1;
+       });
+       
+       System.out.println(Thread.currentThread().getName() + "\t" + thenCombineResult.get());
+   
+       /**
+        * ForkJoinPool.commonPool-worker-9	---come in
+        * ForkJoinPool.commonPool-worker-2	---come in
+        * ForkJoinPool.commonPool-worker-2	---come in
+        * main	21
+        */
+   }
    ```
 
 5. 对计算结果进行合并
@@ -325,6 +467,31 @@ CompletableFuture：
    ```java
    // 两个 CompletionStage 任务都完成后，最终能把两个任务的结果一起交给 thenCombine 来处理。先完成的先等着，等待其它分支任务
    public <U,V> CompletableFuture<V> thenCombine;
+   
+   // 对计算结果进行合并，先完成的先等着，等待其它分支任务
+   private static void thenCombineTest() throws InterruptedException, ExecutionException {
+       CompletableFuture<Integer> thenCombineResult = CompletableFuture.supplyAsync(() -> {
+           System.out.println(Thread.currentThread().getName() + "\t" + "---come in 1");
+           return 10;
+       }).thenCombine(CompletableFuture.supplyAsync(() -> {
+           System.out.println(Thread.currentThread().getName() + "\t" + "---come in 2");
+           return 20;
+       }), (x,y) -> {
+           System.out.println(Thread.currentThread().getName() + "\t" + "---come in 3");
+           return x + y;
+       }).thenCombine(CompletableFuture.supplyAsync(() -> {
+           System.out.println(Thread.currentThread().getName() + "\t" + "---come in 4");
+           return 30;
+       }),(a,b) -> {
+           System.out.println(Thread.currentThread().getName() + "\t" + "---come in 5");
+           return a * b;
+       });
+       System.out.println("-----主线程结束，END");
+       System.out.println(thenCombineResult.get());
+   
+       // 主线程不要立刻结束，否则CompletableFuture默认使用的线程池会立刻关闭:
+       try { TimeUnit.SECONDS.sleep(10); } catch (InterruptedException e) { e.printStackTrace(); }
+   }
    ```
 
 
@@ -536,7 +703,7 @@ public static void unpark(Thread thread);
 2. **await 和 signal**：使用 JUC 包中 Condition 的 await() 方法让线程等待；使用 signal() 方法唤醒线程。
    - Condition 类的 await()、signal() 方法必须在 lock() 和 unlock() 内使用，否则会抛出异常 IllegalMonitorStateException。即有锁才能调用。
    - Condition 类的 await() 方法必须在 signal() 方法前运行，否则会造成阻塞的线程无法被唤醒，程序无法结束。即要先等待再唤醒
-3. **park 和 unpar**：使用 LockSupport 的 park() 方法阻塞线程，使用 unpark() 方法唤醒被阻塞的线程
+3. **park 和 unpark**：使用 LockSupport 的 park() 方法阻塞线程，使用 unpark() 方法唤醒被阻塞的线程
    - park() /park(Object blocker)  ：阻塞当前线程/阻塞传入的具体线程。permit 默认值是 0，所以一开始调用 park() 方法时，当前线程就会阻塞，直到其它线程将当前线程的 permit 的值设置为 1 时，park 方法就会被唤醒，然后会将 permit 的值再次设置为 0 并返回；
    - unpark(Thread thread)：唤醒处于阻塞状态的指定线程。调用后，就会将指定的 thread 线程的许可 permit 的值设置成 1（多次调用 unpark 方法，permit 值不会累加，permit 值还是 1），会自动唤醒该类，即之前被阻塞的 LockSupport.park() 方法会立即返回
    - park() 和 unpark() 方法的使用无锁块要求

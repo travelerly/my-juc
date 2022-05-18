@@ -18,7 +18,7 @@ public class CompletableFutureDemo {
 
     public static void main(String[] args) throws ExecutionException, InterruptedException {
 
-        HashMap<Object, Object> objectObjectHashMap = new HashMap<>();
+        thenCombineTest();
 
     }
 
@@ -97,43 +97,43 @@ public class CompletableFutureDemo {
          */
     }
 
-    // 计算结果存在依赖关系，这两个线程串行化（当前步骤发生异常，携带异常参数继续走下一步）
-    private static void handleTest() {
-        //当一个线程依赖另一个线程时用 handle 方法来把这两个线程串行化,
-        // 异常情况：有异常也可以往下一步走，根据带的异常参数可以进一步处理
-        CompletableFuture.supplyAsync(() -> {
-            //暂停几秒钟线程
-            try { TimeUnit.SECONDS.sleep(1); } catch (InterruptedException e) { e.printStackTrace(); }
-            System.out.println("111");
-            return 1024;
-        }).handle((f,e) -> {
-            int age = 10/0;
-            System.out.println("222");
-            return f + 1;
-        }).handle((f,e) -> {
-            System.out.println("333");
-            return f + 1;
-        }).whenCompleteAsync((v,e) -> {
-            System.out.println("*****v: "+v);
-        }).exceptionally(e -> {
-            e.printStackTrace();
-            return null;
-        });
+// 计算结果存在依赖关系，这两个线程串行化（当前步骤发生异常，携带异常参数继续走下一步）
+private static void handleTest() {
+    //当一个线程依赖另一个线程时用 handle 方法来把这两个线程串行化,
+    // 异常情况：有异常也可以往下一步走，根据带的异常参数可以进一步处理
+    CompletableFuture.supplyAsync(() -> {
+        //暂停几秒钟线程
+        try { TimeUnit.SECONDS.sleep(1); } catch (InterruptedException e) { e.printStackTrace(); }
+        System.out.println("111");
+        return 1024;
+    }).handle((f,e) -> {
+        int age = 10/0;
+        System.out.println("222");
+        return f + 1;
+    }).handle((f,e) -> {
+        System.out.println("333");
+        return f + 1;
+    }).whenCompleteAsync((v,e) -> {
+        System.out.println("*****v: "+v);
+    }).exceptionally(e -> {
+        e.printStackTrace();
+        return null;
+    });
 
-        System.out.println("-----主线程结束，END");
+    System.out.println("-----主线程结束，END");
 
-        // 主线程不要立刻结束，否则CompletableFuture默认使用的线程池会立刻关闭:
-        try { TimeUnit.SECONDS.sleep(2); } catch (InterruptedException e) { e.printStackTrace(); }
+    // 主线程不要立刻结束，否则CompletableFuture默认使用的线程池会立刻关闭:
+    try { TimeUnit.SECONDS.sleep(2); } catch (InterruptedException e) { e.printStackTrace(); }
 
-        /**
-         * 异常结果
-         * -----主线程结束，END
-         * 111
-         * 333
-         * *****v: null
-         * java.util.concurrent.CompletionException: java.lang.NullPointerException
-         */
-    }
+    /**
+     * 异常结果
+     * -----主线程结束，END
+     * 111
+     * 333
+     * *****v: null
+     * java.util.concurrent.CompletionException: java.lang.NullPointerException
+     */
+}
 
     // 计算结果存在依赖关系，这两个线程串行化（当前步骤发生异常，不走下一步，哪步出错，就停在哪步）
     private static void thenApplyTest() {
@@ -227,12 +227,12 @@ public class CompletableFutureDemo {
             {
                 System.out.println("-----result: "+v);
             }
-        }).exceptionally(e -> { // // 异步任务 supplyAsync 发生异常后，回调 exceptionally 方法
+        }).exceptionally(e -> { // 异步任务 supplyAsync 发生异常后，回调 exceptionally 方法
             System.out.println("-----exception: "+e.getCause()+"\t"+e.getMessage());
             return -44;
         });
 
-        //主线程不要立刻结束，否则CompletableFuture默认使用的线程池会立刻关闭:暂停3秒钟线程
+        //主线程不要立刻结束，否则 CompletableFuture 默认使用的线程池会立刻关闭:暂停3秒钟线程
         try { TimeUnit.SECONDS.sleep(3); } catch (InterruptedException e) { e.printStackTrace(); }
     }
 
