@@ -50,8 +50,6 @@ public class ThreadLocalDemo {
         },"t3").start();
         System.out.println(Thread.currentThread().getName()+"\t"+"---"+house.threadLocal.get());
 
-
-
     }
 
     // 三个售票员卖完50张票务，总量完成即可，吃大锅饭，售票员每个月固定月薪
@@ -85,7 +83,6 @@ class MovieTicket {
 }
 
 class House {
-
     ThreadLocal<Integer> threadLocal = ThreadLocal.withInitial(() -> 0);
     public void saleHouse() {
         Integer value = threadLocal.get();

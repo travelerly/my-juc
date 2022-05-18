@@ -14,8 +14,8 @@ public class InterruptThreadDemo {
     private final static AtomicBoolean atomicBoolean = new AtomicBoolean(true);
 
     public static void main(String[] args) {
-
-
+        staticInterruptTest();
+        // atomicBooleanInterruptTest();
     }
 
     // static interrupt 测试

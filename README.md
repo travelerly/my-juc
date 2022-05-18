@@ -1,11 +1,10 @@
 # Java Concurrent Util
 
-
 ## 线程基础知识
 
 **JUC 四大口诀**
 
-1. 高内聚低耦合前提下，封装思想。线程操作资源类。
+1. 高内聚低耦合前提下的封装思想。线程操作资源类。
 2. 判断、干活、通知
 3. 防止虚假唤醒，wait 方法要注意使用 while 判断
 4. 注意标志位 flag，可能是 volatile 修饰的
@@ -22,19 +21,24 @@ Java 多线程相关概念：
 
 - 线程：在同一个进程内，又可以执行多个任务，而每一个任务可以看做是一个线程；一个进程会有 1 和或多个线程的
 
-- 管程：Monitor(监视器对象，管程对象)，就是我们平时说的锁。是一种同步器，它的义务是保证（同一时间）只有一个线程能够访问被保护的数据和代码。JVM 中同步是基于进入和退出监视器对象 (Monitor，管程对象)来实现的，每个对象实例都会有一个 Monitor 对象。Monitor 对象会和 Java 对象一同创建并销毁，底层是由 C++语言来实现的。
+- 管程：Monitor(监视器对象，管程对象)，就是我们平时说的锁。是一种同步器，它的义务是保证（同一时间）只有一个线程能够访问被保护的数据和代码。JVM 中的同步是基于进入和退出监视器对象 (Monitor，管程对象)来实现的，每个对象实例都会有一个 Monitor 对象。Monitor 对象会与 Java 对象一同创建和销毁，底层是由 C++语言来实现的。
 
   > JVM第三版 6.4.10 同步指令
   >
-  > Java 虚拟机 key 支持方法级的同步和方法内部一段指令序列的同步，这两种同步结构都是使用管程（Monitor，更常见的是直接将它称为“锁”）来实现的。
+  > - Java 虚拟机可以支持方法级的同步和方法内部一段指令序列的同步，这两种同步结构都是使用管程（Monitor，更常见的是直接将它称为“锁”）来实现的。
   >
-  > 方法级的同步是隐式的，无需通过字节码指令来控制，它实现在方法调用和返回操作之中。虚拟机可以从方法常量池中的方法表结构中的 **ACC_SYNCHRONIZED** 访问标志得知一个方法是否被声明为同步方法。**当方法调用时，调用指令会检测方法的 ACC_SYNCHRONIZED 访问标志是否被设置，如果设置了，执行线程就要求先成功持有管程，然后才能执行方法，最后方法完成（无论是否正常完成）时释放管程。在方法执行期间，执行线程持有了管程，其它任何线程都无法再获取到同一个管程。**如果一个同步方法执行期间抛出了异常，并且在方法内部无法处理此异常，那这个同步方法所持有的管程将在异常抛到同步方法边界之外时自动释放。
+  > - 方法级的同步是隐式的，无需通过字节码指令来控制，它实现在方法调用和返回操作之中。虚拟机可以从方法常量池中的方法表结构中的 **ACC_SYNCHRONIZED** 访问标志得知一个方法是否被声明为同步方法。**当方法调用时，调用指令会检测方法的 ACC_SYNCHRONIZED 访问标志是否被设置，如果设置了，执行线程就要求先成功持有管程，然后才能执行方法，最后方法完成（无论是否正常完成）时释放管程。在方法执行期间，执行线程持有了管程，其它任何线程都无法再获取到同一个管程。**如果一个同步方法执行期间抛出了异常，并且在方法内部无法处理此异常，那这个同步方法所持有的管程将在异常抛到同步方法边界之外时自动释放。
   >
-  > 同步一段指令集序列通常是由 Java 语言中的 synchronized 语句块来表示的， Java 虚拟机的指令集中有 monitorenter 和 monitorexit 两条指令来支持 synchronized 关键字的语义，正确实现 synchronized 关键字需要 Javac 编译器与 Java 虚拟机两者共同协作支持。
+  > - 同步一段指令集序列通常是由 Java 语言中的 synchronized 语句块来表示的， Java 虚拟机的指令集中有 monitorenter 和 monitorexit 两条指令来支持 synchronized 关键字的语义，正确实现 synchronized 关键字需要 Javac 编译器与 Java 虚拟机两者共同协作支持。
+  >
+  > - 编译器必须确保无论方法通过何种方式完成，方法中调用过的每条 monitorenter 指令都必须执行器对应的 monitorexit 指令，而无论这个方法是正常结束还是异常结束。
+  > - 为了保证方法在异常完成时，monitorenter 和 monitorexit 指令依然可以正确配对执行，编译器会自动产生一个异常处理器，这个异常处理器声明可以处理所有异常，它的目的就是用来执行 monitorexit 指令的。
+  >
+  > 
 
 <br>
 
-用户线程和守护线程：Java 线程分为用户线程和守护线程，线程的 deamon 属性为 true，表示
+用户线程和守护线程：Java 线程分为用户线程和守护线程
 
 - 守护线程：线程的 deamon 属性值为 true，表示是守护线程。是一种特殊的线程，在后台默默地完成一些系统性的服务，比如垃圾回收线程就是守护线程。
 - 用户线程：线程的 deamon 属性值为 false，表示是用户线程。是系统工作线程，会完成这个程序需要完成的业务操作。**设置守护线程，需要在 start() 方法之前进行**。
@@ -219,7 +223,7 @@ CompletableFuture：
           {
               System.out.println("-----result: "+v);
           }
-      }).exceptionally(e -> { // // 异步任务 supplyAsync 发生异常后，回调 exceptionally 方法
+      }).exceptionally(e -> { // 异步任务 supplyAsync 发生异常后，回调 exceptionally 方法
           System.out.println("-----exception: "+e.getCause()+"\t"+e.getMessage());
           return -44;
       });
@@ -335,7 +339,7 @@ CompletableFuture：
 
 - 一个线程不应该由其它线程来强制中断或停止，而是应该由线程自己自行停止，所以 Thread.stop()、Thread.suspend()、Thread.resume() 这些方法都已经被废弃了。
 - 在 Java 中没有办法立即停止一条线程，然而停止线程却显得尤为重要，例如取消一个耗时操作，因此，Java 提供了一种用于停止线程的机制，中断。
-- 中断只是一种协助机制，Java 没有给中断增加任何语法，中断的过程完全有程序员自己实现。
+- 中断只是一种协助机制，Java 没有给中断增加任何语法，中断的过程完全由开发者自己实现。
 - 每个线程对象中有一个标识，用于标识线程是否被中断。该标识位为 true，表示中断；该标识位为 false，表示未中断。通过调用线程对象的 interrupt 方法将可以将该线程的标志位设置为 true；可以在其它线程中调用，也可以在自己的线程中调用.
 - **若要中断一个线程，需要手动调用该线程的 interrupt 方法，该方法仅仅是将线程对象的中断标识设置成 true**，然后需要自行代码实现不断地检测当前线程的标识位，如果为 true，表示其它线程要求这条线程中断，后续逻辑需自行实现。
 
@@ -430,7 +434,7 @@ CompletableFuture：
 
 **interrupt() 方法说明：**
 
-- 当一个线程调用 interrupt() 方法时，如果线程处于正常活动状态，那么会将该线程的中断标识位设置为 true，仅此而已。被设置中断标识的线程将继续正常运行，不收影响。所以 interrupt() 方法并不能真正的中断线程，需要被调用的线程自己进行配合才行；
+- 当一个线程调用 interrupt() 方法时，如果线程处于正常活动状态，那么会将该线程的中断标识位设置为 true，仅此而已。被设置中断标识的线程将继续正常运行，不受影响。所以 interrupt() 方法并不能真正的中断线程，需要被调用的线程自己进行配合才行；
 
 - 如果线程处于被阻塞状态（例如处于 sleep、wait、join 等状态），此时在其它线程中调用当前线程对象的 interrupt() 方法，那么线程将立即退出被阻塞状态，并抛出一个 InterruptedException 异常。sleep() 方法抛出 InterruptedException 后，中断标识也被清空，置为 false。若在 catch 中没有再次使用 interrupt() 方法，将中断标识位再次设置为 true 的话，将导致程序无法停止，导致无限循环下去了
 
@@ -460,7 +464,7 @@ CompletableFuture：
   }
   ```
 
-- 静态 interrupt() 方法。Thread.interrupt()：作用是测试当前线程是否被中断（检查中断标识位），返回一个 boolean，并清除中断状态。第二次再调用时，中断状态已经被清除，将返回一个 false。
+- 静态 interrupted() 方法。Thread.interrupted()：作用是测试当前线程是否被中断（检查中断标识位），返回一个 boolean，并清除中断状态。第二次再调用时，中断状态已经被清除，将返回一个 false。
 
   ```java
   public static void main(String[] args) {
@@ -475,44 +479,112 @@ CompletableFuture：
   }
   ```
 
-  > isInterrupted() 方法和静态 interrupt() 方法的对比都是判断线程是否被中断，但是 isInterrupted() 方法不会清除中断标识，而 interrupt() 方法会清空中断标识。
+  > isInterrupted() 方法和静态 interrupted() 方法的对比都是判断线程是否被中断，但是 isInterrupted() 方法不会清除中断标识，而 interrupted() 方法会清空中断标识。
   >
   > 因为这两个方法都是调用同一个方法 private native boolean isInterrupted(boolean ClearInterrupted)，只不过传入的参数的值不一样
   >
   > isInterrupted() ：传入的参数是 ClearInterrupted=false，即不清楚中断标识位
   >
-  > static interrupt()：传入的参数是 ClearInterrupted=true，即清楚中断标识位
+  > static interrupted()：传入的参数是 ClearInterrupted=true，即清楚中断标识位
 
 <br>
 
 #### LockSupport
 
-LockSupport 是用来创建锁和其它同步类的基本线程阻塞原语。LockSupport 中的 park()、unpark() 方法的作用分别是阻塞线程和唤醒阻塞的线程。
+LockSupport 和 CAS 是 Java 并发包中很多并发工具控制机制的基础，它们底层其实都是依赖 Unsafe 实现。
 
-LockSupport 类使用了一种名为 Permit（许可）的概念来做到**阻塞和唤醒线程**的功能。每个线程都有一个 Permit（许可），permit 只有两个值，1 和 0，默认时 0。可以把许可看成是一种（0，1）信号量（Semaphore），但与 Semaphore 不同的是，许可的累加上限是 1。
+Concurrent 包是基于 AQS (AbstractQueuedSynchronizer) 框架，AQS 框架借助于两个类：Unsafe(提供 CAS 操作) 和 LockSupport(提供 park/unpark 操作)。因此，LockSupport 可谓构建 Concurrent包的基础之一。
+
+LockSupport 是一个线程阻塞工具类，所有的方法都是静态方法，可以让线程在任意位置阻塞，当然阻塞之后肯定得有唤醒的方法。归根结底，LockSupport 调用的 Unsafe 中的native 代码。
+
+LockSupport 是用来创建锁和其他同步类的基本**线程阻塞**原语。LockSupport 提供 park() 和 unpark() 方法实现阻塞线程和解除线程阻塞，LockSupport 和每个使用它的线程都有一个许可(permit)关联。permit 相当于 1，0 的开关，默认是 0，调用一次 unpark 就加 1 变成 1，调用一次 park 会消费 permit，也就是将 1 变成 0，同时 park 立即返回。再次调用 park会变成 block（因为 permit 为 0 了，会阻塞在这里，直到 permit 变为 1），这时调用 unpark 会把 permit 置为 1。每个线程都有一个相关的 permit，permit 最多只有一个，重复调用 unpark 也不会积累。
+
+park() 和 unpark() 不会有 `Thread.suspend` 和 `Thread.resume` 所可能引发的死锁问题，由于许可的存在，调用 park 的线程和另一个试图将其 unpark 的线程之间的竞争将保持活性。
+
+如果调用线程被中断，则park方法会返回。同时park也拥有可以设置超时时间的版本。
+
+```java
+// 给线程 t 设置阻塞对象为 arg，以便出问题时排查阻塞对象，这个方法为私有方法，其他 park 的静态方法会调用这个方法设置 blocker
+private static void setBlocker(Thread t, Object arg)
+// 获取线程 t 的阻塞对象，一般用于排查问题
+public static Object getBlocker(Thread t);
+
+// 暂停当前线程
+public static void park(Object blocker);
+// 暂停当前线程，不过有超时时间的限制
+public static void parkNanos(Object blocker, long nanos);
+// 暂停当前线程，直到某个时间
+public static void parkUntil(Object blocker, long deadline);
+// 无期限暂停当前线程
+public static void park();
+// 暂停当前线程，不过有超时时间的限制
+public static void parkNanos(long nanos);
+// 暂停当前线程，直到某个时间
+public static void parkUntil(long deadline);
+// 恢复当前线程
+public static void unpark(Thread thread);
+```
 
 <br>
 
 **线程等待和唤醒的方式：**
 
-1. wait 和 notify：使用 Object 的 wait() 方法让线程等待；使用 Object 的 notify() 方法唤醒线程；
+1. **wait 和 notify**：使用 Object 的 wait() 方法让线程等待；使用 Object 的 notify() 方法唤醒线程；
+- **Object 类中的 wait、notify、notifyAll 必须在 synchronized 内部使用（同步代码块内或同步方法内），否则会抛出异常 IllegalMonitorStateException。**
+  
+- **Object 类中的 wait() 方法必须在 notify() 方法前运行，否则会造成等待中的线程无法被唤醒，程序无法结束。**
+2. **await 和 signal**：使用 JUC 包中 Condition 的 await() 方法让线程等待；使用 signal() 方法唤醒线程。
+   - Condition 类的 await()、signal() 方法必须在 lock() 和 unlock() 内使用，否则会抛出异常 IllegalMonitorStateException。即有锁才能调用。
+   - Condition 类的 await() 方法必须在 signal() 方法前运行，否则会造成阻塞的线程无法被唤醒，程序无法结束。即要先等待再唤醒
+3. **park 和 unpar**：使用 LockSupport 的 park() 方法阻塞线程，使用 unpark() 方法唤醒被阻塞的线程
+   - park() /park(Object blocker)  ：阻塞当前线程/阻塞传入的具体线程。permit 默认值是 0，所以一开始调用 park() 方法时，当前线程就会阻塞，直到其它线程将当前线程的 permit 的值设置为 1 时，park 方法就会被唤醒，然后会将 permit 的值再次设置为 0 并返回；
+   - unpark(Thread thread)：唤醒处于阻塞状态的指定线程。调用后，就会将指定的 thread 线程的许可 permit 的值设置成 1（多次调用 unpark 方法，permit 值不会累加，permit 值还是 1），会自动唤醒该类，即之前被阻塞的 LockSupport.park() 方法会立即返回
+   - park() 和 unpark() 方法的使用无锁块要求
+   - park() 和 unpark() 方法的使用无顺序要求
+   - park() 和 unpark() 方法的使用必须成对使用
 
-   - **Object 类中的 wait、notify、notifyAll 必须在 synchronized 内部使用（同步代码块内或同步方法内），否则会抛出异常 IllegalMonitorStateException。**
+<br>
 
-   - **Object 类中的 wait() 方法必须在 notify() 方法前运行，否则会造成等待中的线程无法被唤醒，程序无法结束。**
+HotSpot 的源码，每个 java 线程都有一个 Parker 实例，Parker 类是这样定义的：
 
-2. await 和 signal：使用 JUC 包中 Condition 的 await() 方法让线程等待；使用 signal() 方法唤醒线程。
+```java
+class Parker : public os::PlatformParker {  
+private:  
+  volatile int _counter ;  
+  ...  
+public:  
+  void park(bool isAbsolute, jlong time);  
+  void unpark();  
+  ...  
+}  
+class PlatformParker : public CHeapObj<mtInternal> {  
+  protected:  
+    pthread_mutex_t _mutex [1] ;  
+    pthread_cond_t  _cond  [1] ;  
+    ...  
+}
+```
 
-   - **Condition 类的 await()、signal() 方法必须在 lock() 和 unlock() 内使用，否则会抛出异常 IllegalMonitorStateException。即有锁才能调用。**
-   - **Condition 类的 await() 方法必须在 signal() 方法前运行，否则会造成阻塞的线程无法被唤醒，程序无法结束。即要先等待再唤醒**
+LockSupport就是通过控制变量 `_counter`来对线程阻塞唤醒进行控制的。原理有点类似于信号量机制。
 
-3. park 和 unpar：使用 LockSupport 的 park() 方法阻塞线程，使用 unpark() 方法唤醒被阻塞的线程
+- 当调用 `park()`方法时，会将  _counter 置为 0，同时判断前值 < 1 说明前面被 `unpark`过，则直接退出，否则将使该线程阻塞。
+- 当调用 `unpark()`方法时，会将  _counter 置为 1，同时判断前值 < 1 会进行线程唤醒，否则直接退出。
+  形象的理解，线程阻塞需要消耗凭证(permit)，这个凭证最多只有 1 个。当调用 park 方法时，如果有凭证，则会直接消耗掉这个凭证然后正常退出；但是如果没有凭证，就必须阻塞等待凭证可用；而 unpark 则相反，它会增加一个凭证，但凭证最多只能有 1 个。
+- 为什么可以先唤醒线程后阻塞线程？
+  因为 unpark 获得了一个凭证，之后调用 park，因为有凭证消费，故不会阻塞。
+- 为什么唤醒两次后阻塞两次会阻塞线程。
+  因为凭证的数量最多为 1，连续调用两次 unpark 和调用一次 unpark 效果一样，只会增加一个凭证；而调用两次 park 却需要消费两个凭证。
 
-   - **park() /park(Object blocker)  ：阻塞当前线程/阻塞传入的具体线程。permit 默认值是 0，所以一开始调用 park() 方法时，当前线程就会阻塞，直到其它线程将当前线程的 permit 的值设置为 1 时，park 方法就会被唤醒，然后会将 permit 的值再次设置为 0 并返回；**
-   - **unpark(Thread thread)：唤醒处于阻塞状态的指定线程。调用后，就会将指定的 thread 线程的许可 permit 的值设置成 1（多次调用 unpark 方法，permit 值不会累加，permit 值还是 1），会自动唤醒该类，即之前被阻塞的 LockSupport.park() 方法会立即返回**
-   - **park() 和 unpark() 方法的使用无锁块要求**
-   - **park() 和 unpark() 方法的使用无顺序要求**
-   - **park() 和 unpark() 方法的使用必须成对使用**
+<br>
+
+总结
+
+LockSupport.park() 和 unpark() 和 object.wait() 和 notify() 很相似，那么它们有什么区别呢？
+
+1. 面向的主体不一样。LockSuport 主要是针对 Thread 进行阻塞处理，可以指定阻塞队列的目标对象，每次可以指定具体的线程唤醒。Object.wait() 是以对象为纬度，阻塞当前的线程和唤醒单个或所有线程。
+2. 实现机制不同。两者的阻塞队列并不交叉。也就是说 `unpark ` 不会对 `wait `起作用，`notify `也不会对 `park `起作用。object.notifyAll() 不能唤醒 LockSupport 的阻塞 Thread。
+
+LockSupport 是 JDK 中用来实现线程阻塞和唤醒的工具。使用它可以在任何场合使线程阻塞，可以指定任何线程进行唤醒，并且不用担心阻塞和唤醒操作的顺序，但要注意连续多次唤醒的效果和一次唤醒是一样的。
 
 ---
 
@@ -533,11 +605,11 @@ JMM（Java 内存模型 Java Memory Model，简称 JMM），本身是一种抽�
 
 JMM 三大特性
 
-1. 可见性：指当一个线程修改了某一个共享变量的值，其它线程是否能否立即直到该变更。
+1. 可见性：指当一个线程修改了某一个共享变量的值，其它线程是否能否立即察觉到该变更。
 
    <img src="img/线程与主内存和工作内存之间的交互关系.jpg" style="zoom:33%;" />
 
-   > Java中普通的共享变量不保证可见性，因为数据修改被写入内存的时机是不确定的，多线程并发下很可能出现"脏读"，所以每个线程都有自己的***工作内存\***，线程自己的工作内存中保存了该线程使用到的变量的主内存副本拷贝，线程对变量的所有操作（读取，赋值等 ）都必需在线程自己的工作内存中进行，而不能够直接读写主内存中的变量。不同线程之间也无法直接访问对方工作内存中的变量，线程间变量值的传递均需要通过主内存来完成。
+   > Java中普通的共享变量不保证可见性，因为数据修改被写入内存的时机是不确定的，多线程并发下很可能出现"脏读"，所以每个线程都有自己的**工作内存**，线程自己的工作内存中保存了该线程使用到的变量的主内存副本拷贝，线程对变量的所有操作（读取，赋值等 ）都必需在线程自己的工作内存中进行，而不能够直接读写主内存中的变量。不同线程之间也无法直接访问对方工作内存中的变量，线程间变量值的传递均需要通过主内存来完成。
 
 2. 原子性：指一个操作是不可中断的，即多线程环境下，操作不能被其它线程干扰
 
@@ -590,8 +662,8 @@ happens-before 的 8 条规则
 volatile 的内存语义
 
 - 当写一个 volatile 变量时，JMM 会把该线程对应的本地内存中的共享变量值立即刷新回主内存中。
-- 当读一个 volatile 变量时，JMM 会把该线程对应的本地内存设置为无效，直接从主内存中读取共享变量
-- 所以 volatile 的写内存语义是直接刷新到主内存中，读的内存语义是直接从主内存中读取。
+- 当读一个 volatile 变量时，JMM 会把该线程对应的本地内存设置为无效，然后再直接从主内存中读取共享变量
+- 所以 volatile 的写内存语义是直接刷新到主内存中，读内存语义是直接从主内存中读取。
 
 <br>
 
@@ -602,7 +674,7 @@ volatile 的内存语义
 - 写数据时加入内存屏障，可以强制将线程私有的工作内存中的数据刷回主内存
 - 读数据时加入内存平展，可以将线程私有工作内存中的数据失效，重新到主内存中读取最新的数据
 
->  volatile 会在 Class 的内部的 Field 的 flags 添加一个 ACC_VOLATILE。JVM 在将字节码生成及其码的时候，当检测到操作是使用 volatile 修饰的话，就会根据 JMM 要求，在相应的位置插入内存屏障指令。
+>  volatile 会在 Class 的内部的 Field 的 flags 添加一个 ACC_VOLATILE。JVM 在将字节码生成机器码的时候，当检测到操作是使用 volatile 修饰的话，就会根据 JMM 要求，在相应的位置插入内存屏障指令。
 
 <br>
 
@@ -660,7 +732,7 @@ volatile 的可见性：保证不同线程对这个变量进行操作时的可�
   >
   > write：作用于主内存，将 store 传输过来的变量赋值给主内存中的变量
   >
-  > 由于上述操作只能保证单挑指令的原子性，但对于多条指令组合的原子性，由于没有大面积加锁，所以 JVM 提供了另外两个原子指令：
+  > 由于上述操作只能保证单条指令的原子性，但对于多条指令组合的原子性，由于没有大面积加锁，所以 JVM 提供了另外两个原子指令：
   >
   > lock：作用于主内存，将一个变量标记为一个线程独占的状态，只是写的时候加锁，即只锁了写变量的过程
   >
@@ -672,9 +744,9 @@ volatile 的有序性，禁止指令重排
 
 - 重排序是指编译器和处理器为了优化程序性能而对指令序列进行重新排序的一种手段，有时候会改变程序语句的先后顺序。
 
-- 对于不存在数依赖关系的语句，可以重排序，但重排后的指令决不能改变原有的串行语义；对于存在数据依赖关系的语句，禁止重排序。
+- 对于不存在数据依赖关系的语句，可以重排序，但重排后的指令决不能改变原有的串行语义；对于存在数据依赖关系的语句，禁止重排序。
 
-- volatile 底层是通过内存屏障实现禁止指令重排序的
+- **volatile 底层是通过内存屏障实现禁止指令重排序的**
 
 - volatile 写之前的操作，都禁止重排序到 volatile 之后
 
@@ -704,12 +776,12 @@ volatile 的使用场景
 
 #### CAS
 
-CAS 全程是 compare and swap，它是一条 CPU 并发原语。它包含三个操作数，内存位置、预期原值以及更新值。在执行 CAS 操作的时候，将内存位置的值与预期原值比较：
+CAS - compare and swap，它是一条 CPU 并发原语。它包含三个操作数，内存位置、预期原值以及更新值。在执行 CAS 操作的时候，将内存位置的值与预期原值比较：
 
 - 如果相匹配，那么处理器会自动将该位置的值更新为新值
 - 如果不匹配，处理器不做任何操作，多线程同时执行 CAS 操作时，只有一个会成功
 
-CAS 是 JDK 提供的非阻塞原子性操作，它通过硬件保证了比较-更新的原子性。CAS 是一条 CPU 的原子指令（cmpxchg指令），不会造成所谓的数据不一致问题，Unsafe 类提供的 CAS 方法（例如 compareAndSwapXXX），在 intel 的 CPU 中(X86机器上)，底层实现使用的是汇编指令 cmpxchg 指令。执行 cmpxchg 指令的时候，会判断当前系统是否为多核系统，如果是，就给总线加锁，只有一个线程会对总线加锁成功，加锁成功之后会执行 CAS 操作，也就是说 CAS 的原子性实际上是 CPU 实现的，其实在这一点上还是有排他锁的，只是比起用 synchronized， 这里的排他时间要短的多，所以在多线程情况下性能会比较好。
+**CAS 是 JDK 提供的非阻塞原子性操作**，它通过硬件保证了比较-更新的原子性。CAS 是一条 CPU 的原子指令（cmpxchg指令），不会造成所谓的数据不一致问题，Unsafe 类提供的 CAS 方法（例如 compareAndSwapXXX），在 intel 的 CPU 中(X86机器上)，底层实现使用的是汇编指令 cmpxchg 指令。执行 cmpxchg 指令的时候，会判断当前系统是否为多核系统，如果是，就给总线加锁，只有一个线程会对总线加锁成功，加锁成功之后会执行 CAS 操作，也就是说 CAS 的原子性实际上是 CPU 实现的，其实在这一点上还是有排他锁的，只是比起用 synchronized， 这里的排他时间要短的多，所以在多线程情况下性能会比较好。
 
 CAS 并发原语体现在 JAVA 语言中就是 sun.misc.Unsafe 类中的各个方法。调用 UnSafe 类中的 CAS 方法，JVM 会帮我们实现出 CAS 汇编指令。这是一种完全依赖于硬件的功能，通过它实现了原子操作。再次强调，由于 CAS 是一种系统原语，原语属于操作系统用语范畴，是由若干条指令组成的，用于完成某个功能的一个过程，并且原语的执行必须是连续的，在执行过程中不允许被中断，也就是说 CAS 是一条 CPU 的原子指令，不会造成所谓的数据不一致问题。
 
@@ -737,7 +809,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
     } catch (Exception ex) { throw new Error(ex); }
   }
 
-  // 量 value 用 volatile 修饰，保证了多线程之间的内存可见性。
+  // 变量 value 用 volatile 修饰，保证了多线程之间的内存可见性。
   private volatile int value;
 
 
@@ -761,17 +833,17 @@ public final int getAndAddInt(Object o, long offset, int delta) {
 
 > 假设线程 A 和线程 B 两个线程同时执行 getAndAddInt 操作（分别跑在不同 CPU 上）：
 >
-> 1. AtomicInteger 里面的 value 原始值为 3，即主内存中 AtomicInteger 的 value 为 3，根据 JMM 模型，线程 A 和线程 B 各自持有一份值为 3 的 value 的副本分别到各自的工作内存。
-> 2. 线程 A 通过 getIntVolatile(var1, var2) 拿到 value 值 3，这时线程 A 被挂起。
-> 3. 线程 B 也通过 getIntVolatile(var1, var2) 方法获取到 value 值 3，此时刚好线程 B 没有被挂起并执行 compareAndSwapInt 方法比较内存值也为 3，成功修改内存值为 4，线程 B 打完收工，一切OK。
-> 4. 这时线程 A 恢复，执行 compareAndSwapInt 方法比较，发现自己手里的值数字 3 和主内存的值数字 4 不一致，说明该值已经被其它线程抢先一步修改过了，那 A 线程本次修改失败，只能重新读取重新来一遍了。
+> 1. AtomicInteger 里面的 value 原始值为 3，即主内存中 AtomicInteger 的 value 为 3，根据 JMM 模型，线程 A 和线程 B 各自持有一份值为 3 的 value 的副本分别到各自的工作内存；
+> 2. 线程 A 通过 getIntVolatile(var1, var2) 拿到 value 值 3，这时线程 A 被挂起；
+> 3. 线程 B 也通过 getIntVolatile(var1, var2) 方法获取到 value 值 3，此时刚好线程 B 没有被挂起并执行 compareAndSwapInt 方法比较内存值也为 3，成功修改内存值为 4，线程 B 执行完成；
+> 4. 这时线程 A 恢复，执行 compareAndSwapInt 方法比较，发现自己手里的值数字 3 和主内存的值数字 4 不一致，说明该值已经被其它线程抢先一步修改过了，那 A 线程本次修改失败，只能重新读取主内存中变量的值，再重新计算；
 > 5. 线程 A 重新获取 value 值，因为变量 value 被 volatile 修饰，所以其它线程对它的修改，线程 A 总是能够看到，线程 A 继续执行 compareAndSwapInt 进行比较替换，直到成功。
 
 <br>
 
 #### 自旋锁
 
-自旋锁是指尝试获取锁的线程不会立即阻塞，而是采用**循环的方式**去尝试获取锁，当线程发现锁被占用时，会不断循环判断锁的状态，直到获取到锁。这样的好处是减少线程上下文切换的消耗，缺点是循环会消耗 CPU 资源。
+自旋锁是指尝试获取锁的线程不会立即阻塞，而是采用**循环的方式**去尝试获取锁，当线程发现锁被占用时，会不断循环判断锁的状态，直到获取到锁。这样的好处是**减少线程上下文切换**的消耗，缺点是循环会消耗 CPU 资源。
 
 ```java
 // 以 Unsafe 类的 getAndAddInt 方法为例
@@ -816,7 +888,7 @@ CAS 会导致“ABA问题”。CAS 算法实现一个重要前提需要取出内
 
 <br>
 
-#### 引用类似原子类
+#### 原子引用类
 
 - AtomicReference
 
@@ -1168,7 +1240,7 @@ private static final ThreadLocal<DateFormat> df = new ThreadLocal<DateFormat>() 
 
 说明：如果是 JDK8 的应用，可以使用 Instant 代替 Date，LocalDateTime 代替 Calendar， DateTimeFormatter 代替 SimpleDateFormat，官方给出的解释：simple beautiful strong immutable thread-safe。
 
-> SimpleDateFormat 官方注释：SimpleDateFormat 中的日期格式不是同步的。推荐为每个线程创创建独立的格式实例。如果过个线程访问一个格式，则它必须保持外部同步。
+> SimpleDateFormat 官方注释：SimpleDateFormat 中的日期格式不是同步的。推荐为每个线程创创建独立的格式实例。如果多个线程访问一个格式，则它必须保持外部同步。
 >
 > SimpleDateFormat 类内部有一个 Calendar 对象引用，它用来存储和这个 SimpleDateFormat 相关的日期信息，例如：sdf.parse(dateStr)、sdf.format(date)。诸如此类的方法参数传入的日志相关 String，Ddate 等等，都是交由 Calendar 来储存的，这样就会导致如果 SimpleDateFormat 是静态的，那么多个线程之间就会共享这个 SimpleDateFormat，同时也是共享这个 Calendar 应用。（多线程操作共享内容，没有加锁的话就会出现数据异常的情况。）
 
@@ -1201,6 +1273,39 @@ LocalDateTime.parse("2021-11-11 11:11:11", DATE_TIME_FORMAT)
 > 当我们为 ThreadLocal 变量赋值时，实际上就是以当前 ThreadLocal 实例为 key，值为 value 的 Entry，往这个 ThreadLocalMap 中存放。
 >
 > ThreadLocal 对象：JVM 内部维护了一个线程版的 Map<Thread,T>(通过 ThreadLocal 对象的 set 方法，结果把 ThreadLocal 对象自己当做 key，放进了 ThreadLocalMap 中)，每个线程要用到这个 T 的时候，用当前线程去 map 中查找，通过这样让每个线程都拥有了自己独立的变量，在并发场景下是绝对安全的变量。
+
+<br>
+
+#### ThreadLocal 常用方法
+
+```java
+# ThreadLocal.set(value);
+public void set(T value) {
+  Thread t = Thread.currentThread();
+  ThreadLocalMap map = getMap(t);
+  if (map != null)
+    # this：当前 ThreadLocal 本身
+    map.set(this, value);
+  else
+    createMap(t, value);
+}
+
+# ThreadLocal.get();
+public T get() {
+  Thread t = Thread.currentThread();
+  ThreadLocalMap map = getMap(t);
+  if (map != null) {
+    # this：当前 ThreadLocal 本身
+    ThreadLocalMap.Entry e = map.getEntry(this);
+    if (e != null) {
+      @SuppressWarnings("unchecked")
+      T result = (T)e.value;
+      return result;
+    }
+  }
+  return setInitialValue();
+}
+```
 
 <br>
 
@@ -1259,7 +1364,7 @@ try {
   >
   > 它不能单独使用也不能通过它访问对象，虚引用必须和引用队列 (ReferenceQueue)联合使用。
   >
-  > 虚引用的主要作用是跟踪对象被垃圾回收的状态。 **仅仅是提供了一种确保对象被 finalize 以后，做某些事情的机制。
+  > 虚引用的主要作用是跟踪对象被垃圾回收的状态。 仅仅是提供了一种确保对象被 finalize 以后，做某些事情的机制。
   >
   > PhantomReference 的 get 方法总是返回 null，因此无法访问对应的引用对象。
   >
@@ -1336,7 +1441,7 @@ ThreadLocalMap 是一个保存了 ThreadLocal 对象的 Map，是经过了两层
     <td rowspan="2">1it</td>
     <td rowspan="2">4it</td>
     <td rowspan="2">1bit（是否偏向锁）</td>
-    <td rowspan="2">25it（锁标志位）</td>
+    <td rowspan="2">2bit（锁标志位）</td>
   </tr>
   <tr align="center">
   	<td>25bit</td>
@@ -1376,6 +1481,7 @@ ThreadLocalMap 是一个保存了 ThreadLocal 对象的 Map，是经过了两层
     <td>11</td>
   </tr>
 </table>
+
 
 <br>
 
