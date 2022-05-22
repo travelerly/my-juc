@@ -664,7 +664,12 @@ Concurrent 包是基于 AQS (AbstractQueuedSynchronizer) 框架，AQS 框架借�
 
 LockSupport 是一个线程阻塞工具类，所有的方法都是静态方法，可以让线程在任意位置阻塞，当然阻塞之后肯定得有唤醒的方法。归根结底，LockSupport 调用的 Unsafe 中的native 代码。
 
-LockSupport 是用来创建锁和其他同步类的基本**线程阻塞**原语。LockSupport 提供 park() 和 unpark() 方法实现阻塞线程和解除线程阻塞，LockSupport 和每个使用它的线程都有一个许可(permit)关联。permit 相当于 1，0 的开关，默认是 0，调用一次 unpark 就加 1 变成 1，调用一次 park 会消费 permit，也就是将 1 变成 0，同时 park 立即返回。再次调用 park会变成 block（因为 permit 为 0 了，会阻塞在这里，直到 permit 变为 1），这时调用 unpark 会把 permit 置为 1。每个线程都有一个相关的 permit，permit 最多只有一个，重复调用 unpark 也不会积累。
+LockSupport 是用来创建锁和其他同步类的基本**线程阻塞**原语。LockSupport 提供 park() 和 unpark() 方法实现阻塞线程和解除线程阻塞，LockSupport 和每个使用它的线程都有一个许可(permit)关联。permit 相当于 1，0 的开关，默认是 0。
+
+LockSupport 通过许可（permit）实现挂起线程、唤醒挂起线程功能：
+
+- 调用 park 方法时：permit 的默认值为 0，表示没有许可证，需等待许可，则线程会阻塞，直到其它线程将当前线程的 permit 的值设置为 1 时（即发放了许可），park 方法会被唤醒，然后将 permit 的值再次设置为 0，即消费许可，并返回；
+- 调用 unpark 方法时：就会将线程的许可 permit 设置为 1，即发放许可(多次调用 unpark 方法时，许可 permit 的值不会累加，始终为 1)，这将会自动唤醒线程，即阻塞中的 LockSupport.park() 方法会立即返回，即 park 方法会获得许可，并消费许可后返回；
 
 park() 和 unpark() 不会有 `Thread.suspend` 和 `Thread.resume` 所可能引发的死锁问题，由于许可的存在，调用 park 的线程和另一个试图将其 unpark 的线程之间的竞争将保持活性。
 
@@ -839,7 +844,7 @@ volatile 的内存语义
 - 也称之为内存栅栏，内存栅障， 屏障指令等，是一类同步屏障指令，使得 CPU 或编译器对屏障指令的**前**面和**后**面所发出的内存操作执行一个排序的约束。**内存屏障其实就是一种 JVM 指令，Java 内存模型的重排规则会要求 Java 编译器在生成 JVM 指令时，插入特定的内存屏障指令，通过这些内存屏障指令，volatile 实现了 Java 内存模型中的可见性和有序性，但 volatile 无法保证原子性。**
 - 可以阻止屏障两边的指令重排
 - 写数据时加入内存屏障，可以强制将线程私有的工作内存中的数据刷回主内存
-- 读数据时加入内存平展，可以将线程私有工作内存中的数据失效，重新到主内存中读取最新的数据
+- 读数据时加入内存屏障，可以将线程私有工作内存中的数据失效，重新到主内存中读取最新的数据
 
 >  volatile 会在 Class 的内部的 Field 的 flags 添加一个 ACC_VOLATILE。JVM 在将字节码生成机器码的时候，当检测到操作是使用 volatile 修饰的话，就会根据 JMM 要求，在相应的位置插入内存屏障指令。
 
