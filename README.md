@@ -1261,7 +1261,7 @@ final void longAccumulate(long x, LongBinaryOperator fn,
     // 重新计算了当前线程的 hash 后，认为此次不算是一次竞争。都未初始化，可能不存在竞争激烈，即将 wasUncontended 竞争状态设置为 true
     wasUncontended = true;
   }
-  boolean collide = false;                // True if last slot nonempty
+  boolean collide = false; // True if last slot nonempty
   for (;;) {
     Cell[] as; Cell a; int n; long v;
     
@@ -1353,7 +1353,7 @@ final void longAccumulate(long x, LongBinaryOperator fn,
     // CASE3：Cells 数组正在进行初始化，则尝试在基数 base 上进行累加操作
     // 多线程尝试 CAS 修改失败的线程会走到此分支
     else if (casBase(v = base, ((fn == null) ? v + x : fn.applyAsLong(v, x))))
-      break;                          // Fall back on using base
+      break; // Fall back on using base
   }
 }
 ```
@@ -1414,7 +1414,7 @@ private static final ThreadLocal<DateFormat> df = new ThreadLocal<DateFormat>() 
 
 > SimpleDateFormat 官方注释：SimpleDateFormat 中的日期格式不是同步的。推荐为每个线程创创建独立的格式实例。如果多个线程访问一个格式，则它必须保持外部同步。
 >
-> SimpleDateFormat 类内部有一个 Calendar 对象引用，它用来存储和这个 SimpleDateFormat 相关的日期信息，例如：sdf.parse(dateStr)、sdf.format(date)。诸如此类的方法参数传入的日志相关 String，Ddate 等等，都是交由 Calendar 来储存的，这样就会导致如果 SimpleDateFormat 是静态的，那么多个线程之间就会共享这个 SimpleDateFormat，同时也是共享这个 Calendar 应用。（多线程操作共享内容，没有加锁的话就会出现数据异常的情况。）
+> SimpleDateFormat 类内部有一个 Calendar 对象引用，它用来存储和这个 SimpleDateFormat 相关的日期信息，例如：sdf.parse(dateStr)、sdf.format(date)。诸如此类的方法参数传入的日志相关 String，Date 等等，都是交由 Calendar 来储存的，这样就会导致如果 SimpleDateFormat 是静态的，那么多个线程之间就会共享这个 SimpleDateFormat，同时也是共享这个 Calendar 应用。（多线程操作共享内容，没有加锁的话就会出现数据异常的情况。）
 
 ```java
 // 第一种解决方式：ThreadLocal 可以确保每个线程都可以得到各自单独的一个 SimpleDateFormat 的对象，那么自然也就不存在竞争问题了。
@@ -1440,7 +1440,7 @@ LocalDateTime.parse("2021-11-11 11:11:11", DATE_TIME_FORMAT)
 
 <img src="img/Thread-ThreadLocal-ThreadLocalMap之间的关系.jpg" style="zoom: 25%;" />
 
-> ThreadLocalMap 实际上就是一个以 ThreadLocal 实例为 key，任意对象为 value 的 Entry 对象。
+> ThreadLocalMap 是 ThreadLocal 的静态内部类，而 ThreadLocalMap 中还有一个静态内部类 Entry，Entry 采用的是弱引用，其 key 值是当前的 ThreadLocal 对象实例，即ThreadLocalMap 实际上就是一个以 ThreadLocal 实例为 key，任意对象为 value 的 Entry 对象。
 >
 > 当我们为 ThreadLocal 变量赋值时，实际上就是以当前 ThreadLocal 实例为 key，值为 value 的 Entry，往这个 ThreadLocalMap 中存放。
 >
@@ -1540,7 +1540,7 @@ try {
   >
   > PhantomReference 的 get 方法总是返回 null，因此无法访问对应的引用对象。
   >
-  > 其意义在于：说明一个对象已经进入 finalization 阶段，可以被gc回收，用来实现比 finalization 机制更灵活的回收操作。
+  > 其意义在于：说明一个对象已经进入 finalization 阶段，可以被 gc 回收，用来实现比 finalization 机制更灵活的回收操作。
   >
   > 换句话说，设置虚引用关联的唯一目的，就是在这个对象被收集器回收的时候，收到一个系统通知或者后续添加进一步的处理。
 
@@ -1572,7 +1572,36 @@ ThreadLocalMap 是一个保存了 ThreadLocal 对象的 Map，是经过了两层
 
 ##### ThreadLoaclMap 为什么使用弱引用
 
+```java
+static class ThreadLocalMap {
+    static class Entry extends WeakReference<ThreadLocal<?>> {
+        /** The value associated with this ThreadLocal. */
+        Object value;
 
+        Entry(ThreadLocal<?> k, Object v) {
+            super(k);
+            value = v;
+        }
+    }
+```
+
+ThreadLocalMap 使用弱引用作为 key 解决的问题：
+
+- 使用弱引用，可以使得当 ThreadLocal 为 null 时，若没有任何强引用指向 ThreadLocal 实例，那么这个 ThreadLocal 就可以在 gc 时被回收；
+- 使用弱引用只解决了 ThreadLocal 能被及时回收，但其 value 依然存在内存泄漏问题
+
+<br>
+
+ThreadLocalMap 使用弱引用作为 key 存在的内存泄漏问题：
+
+- 如果一个 ThreadLocal 没有外部强引用引用它，那么系统 gc 时，这个 ThreadLocal 就会被回收，这样一来， ThreadLocalMap 中就会出现 key 为 null 的 Entry，就没有办法访问这些 key 为 null 的 Entry 对应的 value 值了，
+- 如果当前线程迟迟不结束的话，这些 key 为 null 的 Entry 的 value 就会一直存在一条强引用链，永远无法回收，造成内存泄漏。
+
+虽然 JDK 调用 ThreadLocalMap 的 getEntry() 函数或者 set() 函数，会清除这些 null key 的 entry，但是还不够，因为可能后面不会调用这些函数，所以这种方式不可能任何情况都能解决。因此很多情况下，需要使用者手动调用 ThreadLocal 的 remove() 函数，手动删除不再需要的 ThreadLocal，防止内存泄漏。
+
+所以，JDK 建议将 ThreadLocal 变量定义为 priavte static 的，这样的话 ThreadLocal 的生命周期更长，由于一直存在 ThreadLocal 的强引用，所以 ThreadLocal 不会被回收，也就能保证任何时候都能根据 ThreadLocal 的弱引用访问到 Entry 的 value 值，然后 remov 它，防止内存泄漏。
+
+如果线程迟迟无法结束，也就是 ThreadLocal 对象将一直不会回收，例如线程池的情况，那么也将导致内存泄漏。因此在使用 ThreadLocal 时，使用完一定要调用 ThreadLocal.remove()。
 
 ---
 
