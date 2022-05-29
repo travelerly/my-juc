@@ -2286,7 +2286,7 @@ JIT 编译器对锁的优化
 
 AQS 是 AbstractQueuedSynchronizer 的缩写，抽象的队列同步器。存在于 JUC/concurrent/locks 包下。
 
-AQS 是用来构建锁或者其它同步器组件的重量级基础框架及整个JUC体系的基石，通过内置的 FIFO 队列来完成资源获取线程的排队工作，并通过一个 int 类变量，表示持有锁的状态。
+AQS 是用来构建锁或者其它同步器组件的重量级基础框架及整个 JUC 体系的基石，通过内置的 FIFO 队列来完成资源获取线程的排队工作，并通过一个 int 类变量，表示持有锁的状态。
 
 <img src="img/AQS队列图示.jpg" style="zoom: 50%;" />
 
@@ -2429,7 +2429,6 @@ protected final boolean tryAcquire(int acquires) {
 static final class NonfairSync extends Sync {
     private static final long serialVersionUID = 7316153563782823691L;
 
-    
     final void lock() {
         if (compareAndSetState(0, 1))
           	// 第一个线程抢占
@@ -2536,6 +2535,7 @@ final boolean acquireQueued(final Node node, int arg) {
             }
           	// 线程再次获取锁失败，会执行 shouldParkAfterFailedAcquire()
             if (shouldParkAfterFailedAcquire(p, node) &&
+                // 用于将当前线程挂起
                 parkAndCheckInterrupt())
                 interrupted = true;
         }
@@ -2556,31 +2556,22 @@ private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
          * to signal it, so it can safely park.
          */
         return true;
-  	// ws > 0，说明是 CANCELLED 状态
+  	// ws > 0，说明是 CANCELLED 状态：表示线程获取锁的请求已经被注销了
     if (ws > 0) {
-        /*
-         * Predecessor was cancelled. Skip over predecessors and
-         * indicate retry.
-         */
       	// 循环判断前驱节点是否也是 CANCELLED 状态，忽略该状态的节点，重新链接队列
         do {
             node.prev = pred = pred.prev;
         } while (pred.waitStatus > 0);
         pred.next = node;
     } else {
-        /*
-         * waitStatus must be 0 or PROPAGATE.  Indicate that we
-         * need a signal, but don't park yet.  Caller will need to
-         * retry to make sure it cannot acquire before parking.
-         */
-      	// 将当前节点的前驱节点设置为 SIGNAL 状态，用于后续唤醒操作
+      	// 将当前节点的前驱节点设置为 SIGNAL 状态（表示线程已经准备好了，就等资源释放了），用于后续唤醒操作
       	// 程序第一次执行到这返回 false，还会进行外层第二次循环？？？？
         compareAndSetWaitStatus(pred, ws, Node.SIGNAL);
     }
     return false;
 }
 
-// 👇🏻 parkAndCheckInterrupt()：用于将当前线程挂起。因为当前节点的前驱节点的 waitStatus 是 SIGNAL状态 
+// 👇🏻 parkAndCheckInterrupt()：用于将当前线程挂起。因为当前节点的前驱节点的 waitStatus 是 SIGNAL 状态 
 private final boolean parkAndCheckInterrupt() {
   	// 将当前线程挂起，程序不会继续向下执行
     LockSupport.park(this);
@@ -2636,8 +2627,6 @@ private void unparkSuccessor(Node node) {
 
 #### 8 锁案例
 
-
-
 <br>
 
 #### 乐观锁与悲观锁
@@ -2649,7 +2638,7 @@ private void unparkSuccessor(Node node) {
 
 #### 公平锁和非公平锁
 
-FIFO（First In First Out） 属于公平锁，否则属于非公平锁。
+FIFO（First In First Out） 既可以属于公平锁，也可以属于非公平锁。
 
 按序排队属于公平锁，就是判断同步队列是否还有先驱节点的存在，如果没有，才能获取到锁，如果有，等待先驱节点释放锁。
 
